@@ -1,0 +1,20 @@
+{
+  "name": "zaicoregister",
+  "version": "0.0.1",
+  "description": "zaico register",
+  "main": "index.js",
+  "scripts": {
+    "start": "babel-node src/index.js",
+    "build": "babel src/ -d build/ --source-maps",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "zaico"
+  ],
+  "author": "chai",
+  "license": "ISC",
+  "dependencies": {
+    "argv": "0.0.2",
+    "axios": "^0.18.0"
+  }
+}

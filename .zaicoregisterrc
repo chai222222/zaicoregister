@@ -1,0 +1,8 @@
+{
+  "token": "T7NGo7v3DuYM3xyjMXrbDwmtrxHdMWsY",
+  "apiUrl": "https://web.zaico.co.jp/api/v1/inventories/",
+  "mapping": {
+    "jan": "code",
+    "picture": "item_image"
+  }
+}
