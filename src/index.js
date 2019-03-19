@@ -1,6 +1,7 @@
 import 'babel-polyfill';  // eslint-disable-line import/no-extraneous-dependencies
 import fs from 'fs';
 import argv from 'argv';
+import ZaicoOpes from './ZaicoOpe';
 
 const fixedArgs = [ {
   name: 'mode',
@@ -12,13 +13,15 @@ const fixedArgs = [ {
 argv.option([ ...fixedArgs]);
 const args = argv.run();
 const mode = args.options.mode || 'verify';
+const opeCreator = ZaicoOpes[mode];
 
-if (args.targets.length < 1) {
+if (args.targets.length < 1 || !opeCreator) {
   argv.help();
   process.exit(0);
 }
 
 const rc = JSON.parse(fs.readFileSync('./zaicoregisterrc', 'utf8'));
+cnnst ope = opeCreator(rc);
 
 
 args.targets.forEach()

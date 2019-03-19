@@ -1,5 +1,6 @@
 import axios from 'axios';
 import fs from 'fs';
+import _ from 'lodash';
 
 class ZaioOpeBase {
 
@@ -62,13 +63,26 @@ class Verify extends ZaioOpeBase {
 const base64Keys = new Set(['picture']);
 
 const doData = (method, config, row) => {
-  Object.keys(row).map(k => base64Keys.has(k) ? fs.readFileSync(row[k]).toString('base64') : row[k]);
+  const data = _.fromPairs(_.toPairs(row).map(([k,v]) => [
+    k in config.mapping ? config.mapping[k] : k,
+    base64Keys.has(k) ? fs.readFileSync(v).toString('base64') : v
+  ]));
+  return axios.request({
+    method,
+    data,
+  });
 }
 
 class Add extends ZaioOpeBase {
+  eachRow(row) {
+    return doData('POST', this.config, row);
+  }
 }
 
 class Update extends ZaioOpeBase {
+  eachRow(row) {
+    return doData('PUT', this.config, row);
+  }
 }
 
 class Delete extends ZaioOpeBase {
