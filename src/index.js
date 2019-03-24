@@ -4,6 +4,11 @@ import argv from 'argv';
 import ZaicoOpes from './ZaicoOpe';
 
 const fixedArgs = [ {
+  name: 'cache',
+  short: 'c',
+  type: 'boolean',
+  description: 'enable cache',
+}, {
   name: 'mode',
   short: 'm',
   type: 'string',
@@ -20,8 +25,7 @@ if (args.targets.length < 1 || !opeCreator) {
   process.exit(0);
 }
 
-const rc = JSON.parse(fs.readFileSync('./zaicoregisterrc', 'utf8'));
-cnnst ope = opeCreator(rc);
+const rc = JSON.parse(fs.readFileSync('./.zaicoregisterrc', 'utf8'));
+const ope = opeCreator(rc, args.options);
+args.targets.forEach(target => ope.processFile(target));
 
-
-args.targets.forEach()
