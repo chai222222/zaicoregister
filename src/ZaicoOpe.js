@@ -2,13 +2,19 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import _ from 'lodash';
-
+import mime from 'mime';
 
 class ZaioOpeBase {
   static Converters = {
     fileToBase64: {
       type: 'path',
-      cvt: (filePath) => fs.readFileSync(filePath, 'base64')/*.replace(/.{60}/g, "$&\n")*/,
+      // <img src="data:image/png;base64,xxxxx..." />
+      cvt: (filePath) => {
+        const mimeType = mime.getType(filePath.replace(/^.*\./, ''));
+        if (mimeType === 'application/octet-stream') throw new Error(`Couldn't get mime from ${filePath}`);
+        const body = fs.readFileSync(filePath, 'base64');
+        return `data:${mimeType};base64,${body}`;
+      },
     }
   };
 
@@ -151,11 +157,11 @@ class AddOperation extends ZaioOpeBase {
   async eachRow(row) {
     const headers = this.createRequestHeaders();
     const data = this.createRequestData('add', row);
-    this.log(row,data);
+    // this.log(row,data);
     const res = await axios.post(this.config.apiUrl, data, { headers }).catch((e) => this.err(e));
-    if (res && this.useCache()) {
+    if (res.data && this.useCache()) {
       const getRes = await axios.get(`${this.config.apiUrl}/${res.data.data_id}`, { headers }).catch((e) => this.err(e));
-      this.config.data.push(getRes);
+      if (getRes) this.context.data.push(getRes.data);
     }
   }
 
