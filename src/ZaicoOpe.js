@@ -100,8 +100,22 @@ class ZaioOpeBase {
   async getZaicoData() {
     this.log('** get list', this.config.cacheFile);
     const headers = this.createRequestHeaders();
-    const res = await axios.get(this.config.apiUrl, { headers }).catch((e) => this.err(e));
-    return res ? res.data : undefined;
+    let nextUrl = `${this.config.apiUrl}?page=1`; // 先頭ページからアクセス
+    const allData = [];
+    while (nextUrl) {
+      this.log('** get list', nextUrl);
+      const res = await axios.get(nextUrl, { headers }).catch((e) => this.err(e));
+      nextUrl = undefined;
+      if (res && Array.isArray(res.data)) {
+        allData.push(...res.data);
+        const link = res.headers.link;
+        let m;
+        if (link && (m = /<([^>]+)>; *rel="next"/.exec(link))) {
+          nextUrl = m[1];
+        }
+      }
+    }
+    return allData;
   }
 
   useCache() {

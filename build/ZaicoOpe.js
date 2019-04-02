@@ -36,6 +36,8 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -146,23 +148,49 @@ var ZaioOpeBase = function () {
       var _ref3 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
         var _this2 = this;
 
-        var headers, res;
+        var headers, nextUrl, allData, res, link, m;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
                 this.log('** get list', this.config.cacheFile);
                 headers = this.createRequestHeaders();
-                _context.next = 4;
-                return _axios2.default.get(this.config.apiUrl, { headers: headers }).catch(function (e) {
+                nextUrl = this.config.apiUrl + '?page=1'; // 先頭ページからアクセス
+
+                allData = [];
+
+              case 4:
+                if (!nextUrl) {
+                  _context.next = 13;
+                  break;
+                }
+
+                this.log('** get list', nextUrl);
+                _context.next = 8;
+                return _axios2.default.get(nextUrl, { headers: headers }).catch(function (e) {
                   return _this2.err(e);
                 });
 
-              case 4:
+              case 8:
                 res = _context.sent;
-                return _context.abrupt('return', res ? res.data : undefined);
 
-              case 6:
+                nextUrl = undefined;
+                if (res && Array.isArray(res.data)) {
+                  allData.push.apply(allData, _toConsumableArray(res.data));
+                  link = res.headers.link;
+                  m = void 0;
+
+                  if (link && (m = /<([^>]+)>; *rel="next"/.exec(link))) {
+                    nextUrl = m[1];
+                  }
+                }
+                _context.next = 4;
+                break;
+
+              case 13:
+                return _context.abrupt('return', allData);
+
+              case 14:
               case 'end':
                 return _context.stop();
             }
