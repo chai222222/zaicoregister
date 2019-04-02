@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import _ from 'lodash';
+import { forEachSeries } from 'p-iteration';
 import mime from 'mime';
 
 class ZaioOpeBase {
@@ -22,6 +23,7 @@ class ZaioOpeBase {
     this.config = config;
     this.options = options;
     this.context = {};
+    this.context.orgData = [];
   }
 
   _cvtArgPath(filePath) {
@@ -83,61 +85,114 @@ class ZaioOpeBase {
     return this.config.mapping[key] || key;
   }
 
-  loadContextData() {
+  loadCacheData() {
     this.log('** read cahce', this.config.cacheFile);
     this.context.data = JSON.parse(fs.readFileSync(this.config.cacheFile, 'utf-8'));
+    this.cloneData();
   }
 
-  saveContextData() {
+  saveCacheData() {
     this.log('** write cahce', this.config.cacheFile);
     fs.writeFileSync(this.config.cacheFile, JSON.stringify(this.context.data, null, '  '), 'utf-8');
+    this.cloneData();
+  }
+
+  async getZaicoData() {
+    this.log('** get list', this.config.cacheFile);
+    const headers = this.createRequestHeaders();
+    const res = await axios.get(this.config.apiUrl, { headers }).catch((e) => this.err(e));
+    return res ? res.data : undefined;
   }
 
   useCache() {
     return this.options.cache && this.config.cacheFile;
   }
 
+  listZaico(jan) {
+    return this.context.data.filter(z => z[this.mappingKey('jan')] === jan);
+  }
+
   findZaico(jan) {
     return this.context.data.find(z => z[this.mappingKey('jan')] === jan);
   }
 
-  async beforeRows() {
+  cloneData() {
+    this.context.orgData = _.cloneDeep(this.context.data);
+  }
+
+  isChangedData() {
+    return JSON.stringify(this.context.data) !== JSON.stringify(this.context.orgData);
+  }
+
+  async beforeFiles() {
     if (this.useCache()) {
       if (fs.existsSync(this.config.cacheFile)) {
-        this.loadContextData();
+        this.loadCacheData();
         return;
       }
     }
-    const headers = this.createRequestHeaders();
     this.context.data = [];
-    this.log('** get list', this.config.cacheFile);
-    const res = await axios.get(this.config.apiUrl, { headers }).catch((e) => this.err(e));
-    this.context.data = res.data;
-    if (this.useCache()) {
-      this.saveContextData();
+    const list = await this.getZaicoData();
+    if (list) {
+      this.context.data = list;
+      if (this.useCache()) {
+        this.saveCacheData();
+      }
     }
   }
 
-  afterRows() { }
-  beforeRow() { }
-  afterRow() { }
-  eachRow() { }
+  async afterFiles() {
+    if (this.useCache() && this.isChangedData()) {
+      this.saveCacheData();
+    }
+  }
 
-  processFile(filePath) {
+  async beforeRows() { }
+  async afterRows() { }
+  async beforeRow() { }
+  async afterRow() { }
+  async eachRow() { }
+
+  async updateDatum(id, del = false) {
+    if (this.useCache()) {
+      if (del) {
+        this.context.data = this.context.data.filter(row => row.id !== id);
+      } else {
+        const headers = this.createRequestHeaders();
+        const getRes = await axios.get(`${this.config.apiUrl}/${id}`, { headers }).catch((e) => this.err(e));
+        if (getRes) {
+          const idx = this.context.data.findIndex(row => row.id === id);
+          if (idx >= 0) {
+            this.context.data[idx] = getRes.data;
+          } else {
+            this.context.data.push(getRes.data);
+          }
+        }
+      }
+    }
+  }
+
+  async processFiles(filePaths) {
+    await this.beforeFiles();
+    await forEachSeries(filePaths, async f => await this.processFile(f))
+    await this.afterFiles();
+  }
+
+  async processFile(filePath) {
     this.context.filePath = filePath; // 対象ファイル
     this.context.fileDir = path.dirname(filePath); // 対象dir
     const jangetterResult = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     this.log('***', jangetterResult.title, '***');
     const rows = jangetterResult.rows;
     if (Array.isArray(rows)) {
-      this.beforeRows(rows);
-      rows.forEach((row => {
-        this.beforeRow(row);
+      await this.beforeRows(rows);
+      await forEachSeries(rows, async row => {
+        await this.beforeRow(row);
         this.log('*', row.title);
-        this.eachRow(row);
-        this.afterRow(row);
-      }))
-      this.afterRows(rows);
+        await this.eachRow(row);
+        await this.afterRow(row);
+      });
+      await this.afterRows(rows);
     } else {
       this.log('*** rows is not array.');
     }
@@ -146,10 +201,11 @@ class ZaioOpeBase {
 
 class VerifyOperation extends ZaioOpeBase {
 
-  eachRow(row) {
-    const found = this.findZaico(row.jan);
-    const msg = found ? '登録済' : '未登録';
-    this.log(msg, row.jan);
+  async eachRow(row) {
+    const msgs = ['未登録', '登録済み', '**複数登録済み**'];
+    const list = this.listZaico(row.jan);
+    const msg = msgs[list.length > 1 ? 2 : list.length];
+    this.log(msg, list.map(row => row.jan).join(','));
   }
 }
 
@@ -159,16 +215,8 @@ class AddOperation extends ZaioOpeBase {
     const data = this.createRequestData('add', row);
     // this.log(row,data);
     const res = await axios.post(this.config.apiUrl, data, { headers }).catch((e) => this.err(e));
-    if (res.data && this.useCache()) {
-      const getRes = await axios.get(`${this.config.apiUrl}/${res.data.data_id}`, { headers }).catch((e) => this.err(e));
-      if (getRes) this.context.data.push(getRes.data);
-    }
-  }
-
-  afterRows() {
-    if (this.useCache()) {
-      this.saveContextData();
-    }
+    this.log('追加', row.jan, res.data.data_id);
+    if (res) await this.updateDatum(res.data.data_id);
   }
 }
 
@@ -179,6 +227,8 @@ class UpdateOperation extends ZaioOpeBase {
       const headers = this.createRequestHeaders();
       const data = this.createRequestData('update', row);
       const res = await axios.put(`${this.config.apiUrl}/${found.id}`, data, { headers }).catch((e) => this.err(e));
+      this.log('更新', row.jan, found.id);
+      if (res) await this.updateDatum(found.id);
     } else {
       this.log('未登録のため更新できません', row.jan, row.title);
     }
@@ -191,9 +241,28 @@ class DeleteOperation extends ZaioOpeBase {
     if (found) {
       const headers = this.createRequestHeaders();
       const res = await axios.delete(`${this.config.apiUrl}/${found.id}`, { headers }).catch((e) => this.err(e));
+      this.log('削除', row.jan, found.id);
+      if (res) await this.updateDatum(found.id, true);
     } else {
       this.log('未登録のため削除できません', row.jan, row.title);
     }
+  }
+}
+
+class CacheUpdateOperation extends ZaioOpeBase {
+  async beforeFiles() {
+    const list = await this.getZaicoData();
+    if (list) this.context.data = list;
+  }
+
+  async processFile() {}
+
+  useCache() {
+    return true;
+  }
+
+  isChangedData() {
+    return true;
   }
 }
 
@@ -202,4 +271,5 @@ export default {
   add: (...args) => new AddOperation(...args),
   update: (...args) => new UpdateOperation(...args),
   delete: (...args) => new DeleteOperation(...args),
+  cache: (...args) => new CacheUpdateOperation(...args),
 }

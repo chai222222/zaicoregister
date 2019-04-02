@@ -25,7 +25,7 @@ var fixedArgs = [{
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete'
+  description: 'run mode. verify(default), add, update, delete, cache'
 }]; // eslint-disable-line import/no-extraneous-dependencies
 
 
@@ -41,7 +41,5 @@ if (args.targets.length < 1 || !opeCreator) {
 
 var rc = JSON.parse(_fs2.default.readFileSync('./.zaicoregisterrc', 'utf8'));
 var ope = opeCreator(rc, args.options);
-args.targets.forEach(function (target) {
-  return ope.processFile(target);
-});
+ope.processFiles(args.targets);
 //# sourceMappingURL=index.js.map

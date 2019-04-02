@@ -12,7 +12,7 @@ const fixedArgs = [ {
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete',
+  description: 'run mode. verify(default), add, update, delete, cache',
 } ];
 
 argv.option([ ...fixedArgs]);
@@ -27,5 +27,5 @@ if (args.targets.length < 1 || !opeCreator) {
 
 const rc = JSON.parse(fs.readFileSync('./.zaicoregisterrc', 'utf8'));
 const ope = opeCreator(rc, args.options);
-args.targets.forEach(target => ope.processFile(target));
+ope.processFiles(args.targets);
 
