@@ -4,6 +4,7 @@ import path from 'path';
 import _ from 'lodash';
 import { forEachSeries } from 'p-iteration';
 import mime from 'mime';
+import JsonUtil from './util/JsonUtil'
 
 class ZaioOpeBase {
   static Converters = {
@@ -87,7 +88,7 @@ class ZaioOpeBase {
 
   loadCacheData() {
     this.log('** read cahce', this.config.cacheFile);
-    this.context.data = JSON.parse(fs.readFileSync(this.config.cacheFile, 'utf-8'));
+    this.context.data = JsonUtil.loadJson(this.config.cacheFile);
     this.cloneData();
   }
 
@@ -203,7 +204,7 @@ class ZaioOpeBase {
   async processFile(filePath) {
     this.context.filePath = filePath; // 対象ファイル
     this.context.fileDir = path.dirname(filePath); // 対象dir
-    const jangetterResult = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const jangetterResult = JsonUtil.loadJson(filePath);
     this.log('***', jangetterResult.title, '***');
     const rows = jangetterResult.rows;
     if (Array.isArray(rows)) {

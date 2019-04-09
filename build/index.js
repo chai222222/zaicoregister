@@ -2,10 +2,6 @@
 
 require('babel-polyfill');
 
-var _fs = require('fs');
-
-var _fs2 = _interopRequireDefault(_fs);
-
 var _argv = require('argv');
 
 var _argv2 = _interopRequireDefault(_argv);
@@ -13,6 +9,10 @@ var _argv2 = _interopRequireDefault(_argv);
 var _ZaicoOpe = require('./ZaicoOpe');
 
 var _ZaicoOpe2 = _interopRequireDefault(_ZaicoOpe);
+
+var _JsonUtil = require('./util/JsonUtil');
+
+var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -38,14 +38,19 @@ if (!opeCreator) {
   _argv2.default.help();
   process.exit(1);
 } else {
-  var rc = JSON.parse(_fs2.default.readFileSync('./.zaicoregisterrc', 'utf8'));
-  opeCreator(rc, args.options).processFiles(args.targets).then(function (res) {
-    if (!res) {
-      _argv2.default.help();
-      process.exit(2);
-    }
-  }).catch(function (e) {
+  try {
+    var rc = _JsonUtil2.default.loadJson('./.zaicoregisterrc');
+    opeCreator(rc, args.options).processFiles(args.targets).then(function (res) {
+      if (!res) {
+        _argv2.default.help();
+        process.exit(2);
+      }
+    }).catch(function (e) {
+      throw e;
+    });
+  } catch (e) {
     console.log(e);
-  });
+    process.exit(3);
+  }
 }
 //# sourceMappingURL=index.js.map

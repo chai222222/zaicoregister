@@ -30,6 +30,10 @@ var _mime = require('mime');
 
 var _mime2 = _interopRequireDefault(_mime);
 
+var _JsonUtil = require('./util/JsonUtil');
+
+var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
@@ -132,7 +136,7 @@ var ZaioOpeBase = function () {
     key: 'loadCacheData',
     value: function loadCacheData() {
       this.log('** read cahce', this.config.cacheFile);
-      this.context.data = JSON.parse(_fs2.default.readFileSync(this.config.cacheFile, 'utf-8'));
+      this.context.data = _JsonUtil2.default.loadJson(this.config.cacheFile);
       this.cloneData();
     }
   }, {
@@ -570,7 +574,7 @@ var ZaioOpeBase = function () {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
-                jangetterResult = JSON.parse(_fs2.default.readFileSync(filePath, 'utf8'));
+                jangetterResult = _JsonUtil2.default.loadJson(filePath);
 
                 this.log('***', jangetterResult.title, '***');
                 rows = jangetterResult.rows;

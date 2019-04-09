@@ -1,7 +1,7 @@
 import 'babel-polyfill';  // eslint-disable-line import/no-extraneous-dependencies
-import fs from 'fs';
 import argv from 'argv';
 import ZaicoOpes from './ZaicoOpe';
+import JsonUtil from './util/JsonUtil'
 
 const fixedArgs = [ {
   name: 'cache',
@@ -24,13 +24,18 @@ if (!opeCreator) {
   argv.help();
   process.exit(1);
 } else {
-  const rc = JSON.parse(fs.readFileSync('./.zaicoregisterrc', 'utf8'));
-  opeCreator(rc, args.options).processFiles(args.targets).then(res => {
-    if (!res) {
-      argv.help();
-      process.exit(2);
-    }
-  }).catch(e => {
+  try {
+    const rc = JsonUtil.loadJson('./.zaicoregisterrc');
+    opeCreator(rc, args.options).processFiles(args.targets).then(res => {
+      if (!res) {
+        argv.help();
+        process.exit(2);
+      }
+    }).catch(e => {
+      throw e;
+    });
+  } catch (e) {
     console.log(e);
-  });
+    process.exit(3);
+  }
 }
