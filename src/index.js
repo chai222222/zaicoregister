@@ -12,7 +12,7 @@ const fixedArgs = [ {
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete, cache',
+  description: 'run mode. verify(default), add, update, delete, updateAdd, cache',
 } ];
 
 argv.option([ ...fixedArgs]);
@@ -20,12 +20,17 @@ const args = argv.run();
 const mode = args.options.mode || 'verify';
 const opeCreator = ZaicoOpes[mode];
 
-if (args.targets.length < 1 || !opeCreator) {
+if (!opeCreator) {
   argv.help();
-  process.exit(0);
+  process.exit(1);
+} else {
+  const rc = JSON.parse(fs.readFileSync('./.zaicoregisterrc', 'utf8'));
+  opeCreator(rc, args.options).processFiles(args.targets).then(res => {
+    if (!res) {
+      argv.help();
+      process.exit(2);
+    }
+  }).catch(e => {
+    console.log(e);
+  });
 }
-
-const rc = JSON.parse(fs.readFileSync('./.zaicoregisterrc', 'utf8'));
-const ope = opeCreator(rc, args.options);
-ope.processFiles(args.targets);
-

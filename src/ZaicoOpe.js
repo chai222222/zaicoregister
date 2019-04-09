@@ -138,6 +138,10 @@ class ZaioOpeBase {
     return JSON.stringify(this.context.data) !== JSON.stringify(this.context.orgData);
   }
 
+  canProcess(files) {
+    return files.length > 0;
+  }
+
   async beforeFiles() {
     if (this.useCache()) {
       if (fs.existsSync(this.config.cacheFile)) {
@@ -187,9 +191,13 @@ class ZaioOpeBase {
   }
 
   async processFiles(filePaths) {
+    if (!this.canProcess(filePaths)) {
+      return false;
+    }
     await this.beforeFiles();
     await forEachSeries(filePaths, async f => await this.processFile(f))
     await this.afterFiles();
+    return true;
   }
 
   async processFile(filePath) {
@@ -249,6 +257,24 @@ class UpdateOperation extends ZaioOpeBase {
   }
 }
 
+class UpdateOrAddOperation extends ZaioOpeBase {
+  async eachRow(row) {
+    const found = this.findZaico(row.jan);
+    const headers = this.createRequestHeaders();
+    if (found) {
+      const data = this.createRequestData('update', row);
+      const res = await axios.put(`${this.config.apiUrl}/${found.id}`, data, { headers }).catch((e) => this.err(e));
+      this.log('更新', row.jan, found.id);
+      if (res) await this.updateDatum(found.id);
+    } else {
+      const data = this.createRequestData('add', row);
+      const res = await axios.post(this.config.apiUrl, data, { headers }).catch((e) => this.err(e));
+      this.log('追加', row.jan, res.data.data_id);
+      if (res) await this.updateDatum(res.data.data_id);
+    }
+  }
+}
+
 class DeleteOperation extends ZaioOpeBase {
   async eachRow(row) {
     const found = this.findZaico(row.jan);
@@ -278,12 +304,17 @@ class CacheUpdateOperation extends ZaioOpeBase {
   isChangedData() {
     return true;
   }
+
+  canProcess() {
+    return true;
+  }
 }
 
 export default {
   verify: (...args) => new VerifyOperation(...args),
   add: (...args) => new AddOperation(...args),
   update: (...args) => new UpdateOperation(...args),
+  updateAdd: (...args) => new UpdateOrAddOperation(...args),
   delete: (...args) => new DeleteOperation(...args),
   cache: (...args) => new CacheUpdateOperation(...args),
 }

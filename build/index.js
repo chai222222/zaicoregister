@@ -25,7 +25,7 @@ var fixedArgs = [{
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete, cache'
+  description: 'run mode. verify(default), add, update, delete, updateAdd, cache'
 }]; // eslint-disable-line import/no-extraneous-dependencies
 
 
@@ -34,12 +34,18 @@ var args = _argv2.default.run();
 var mode = args.options.mode || 'verify';
 var opeCreator = _ZaicoOpe2.default[mode];
 
-if (args.targets.length < 1 || !opeCreator) {
+if (!opeCreator) {
   _argv2.default.help();
-  process.exit(0);
+  process.exit(1);
+} else {
+  var rc = JSON.parse(_fs2.default.readFileSync('./.zaicoregisterrc', 'utf8'));
+  opeCreator(rc, args.options).processFiles(args.targets).then(function (res) {
+    if (!res) {
+      _argv2.default.help();
+      process.exit(2);
+    }
+  }).catch(function (e) {
+    console.log(e);
+  });
 }
-
-var rc = JSON.parse(_fs2.default.readFileSync('./.zaicoregisterrc', 'utf8'));
-var ope = opeCreator(rc, args.options);
-ope.processFiles(args.targets);
 //# sourceMappingURL=index.js.map
