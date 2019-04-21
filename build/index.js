@@ -22,10 +22,19 @@ var fixedArgs = [{
   type: 'boolean',
   description: 'enable cache'
 }, {
+  name: 'dryrun',
+  type: 'boolean',
+  description: 'dry run mode'
+}, {
+  name: 'force',
+  short: 'f',
+  type: 'boolean',
+  description: 'force mode'
+}, {
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete, updateAdd, cache'
+  description: 'run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate'
 }]; // eslint-disable-line import/no-extraneous-dependencies
 
 

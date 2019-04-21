@@ -8,10 +8,6 @@ var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = [
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _axios = require('axios');
-
-var _axios2 = _interopRequireDefault(_axios);
-
 var _fs = require('fs');
 
 var _fs2 = _interopRequireDefault(_fs);
@@ -34,13 +30,17 @@ var _JsonUtil = require('./util/JsonUtil');
 
 var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
 
+var _ZaicoRequester = require('./ZaicoRequester');
+
+var _ZaicoRequester2 = _interopRequireDefault(_ZaicoRequester);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
 
@@ -54,6 +54,7 @@ var ZaioOpeBase = function () {
     this.options = options;
     this.context = {};
     this.context.orgData = [];
+    this.requester = new _ZaicoRequester2.default(config, options);
   }
 
   _createClass(ZaioOpeBase, [{
@@ -76,27 +77,18 @@ var ZaioOpeBase = function () {
     }
   }, {
     key: 'createRequestData',
-    value: function createRequestData(method, data) {
+    value: function createRequestData(method, data, found) {
       var _this = this;
 
-      var init = this.config.initialValue[method] || {};
+      var init = _lodash2.default.cloneDeep(this.config.initialValue[method] || {});
       var convert = this.config.convert || {};
-      return _lodash2.default.fromPairs(_lodash2.default.toPairs(Object.assign(init, data)).map(function (_ref) {
+      return this.assignData(_lodash2.default.fromPairs(_lodash2.default.toPairs(Object.assign(init, data)).map(function (_ref) {
         var _ref2 = _slicedToArray(_ref, 2),
             key = _ref2[0],
             value = _ref2[1];
 
         return [_this.mappingKey(key), _this.convert(convert[key], value)];
-      }));
-    }
-  }, {
-    key: 'createRequestHeaders',
-    value: function createRequestHeaders() {
-      return {
-        Authorization: 'Bearer ' + this.config.token,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
+      })));
     }
   }, {
     key: 'log',
@@ -106,31 +98,15 @@ var ZaioOpeBase = function () {
       (_console = console).log.apply(_console, arguments);
     }
   }, {
-    key: 'err',
-    value: function err(_err) {
-      if (_err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.log(_err.response.data);
-        console.log(_err.response.status); // 例：400
-        console.log(_err.response.statusText); // Bad Request
-        console.log(_err.response.headers);
-      } else if (_err.request) {
-        // The request was made but no response was received
-        // `err.request` is an instance of XMLHttpRequest in the browser and an instance of
-        // http.ClientRequest in node.js
-        console.log(_err.request);
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        console.log('Error', _err.message);
-      }
-      console.log(_err.config);
-      if (_err.stack) console.log(_err.stack);
-    }
-  }, {
     key: 'mappingKey',
     value: function mappingKey(key) {
       return this.config.mapping[key] || key;
+    }
+  }, {
+    key: 'assignData',
+    value: function assignData(data) {
+      // TODO: optional_attributes対策を考える
+      return data;
     }
   }, {
     key: 'loadCacheData',
@@ -150,51 +126,18 @@ var ZaioOpeBase = function () {
     key: 'getZaicoData',
     value: function () {
       var _ref3 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
-        var _this2 = this;
-
-        var headers, nextUrl, allData, res, link, m;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
                 this.log('** get list', this.config.cacheFile);
-                headers = this.createRequestHeaders();
-                nextUrl = this.config.apiUrl + '?page=1'; // 先頭ページからアクセス
+                _context.next = 3;
+                return this.requester.list();
 
-                allData = [];
+              case 3:
+                return _context.abrupt('return', _context.sent);
 
               case 4:
-                if (!nextUrl) {
-                  _context.next = 13;
-                  break;
-                }
-
-                this.log('** get list', nextUrl);
-                _context.next = 8;
-                return _axios2.default.get(nextUrl, { headers: headers }).catch(function (e) {
-                  return _this2.err(e);
-                });
-
-              case 8:
-                res = _context.sent;
-
-                nextUrl = undefined;
-                if (res && Array.isArray(res.data)) {
-                  allData.push.apply(allData, _toConsumableArray(res.data));
-                  link = res.headers.link;
-                  m = void 0;
-
-                  if (link && (m = /<([^>]+)>; *rel="next"/.exec(link))) {
-                    nextUrl = m[1];
-                  }
-                }
-                _context.next = 4;
-                break;
-
-              case 13:
-                return _context.abrupt('return', allData);
-
-              case 14:
               case 'end':
                 return _context.stop();
             }
@@ -216,19 +159,19 @@ var ZaioOpeBase = function () {
   }, {
     key: 'listZaico',
     value: function listZaico(jan) {
-      var _this3 = this;
+      var _this2 = this;
 
       return this.context.data.filter(function (z) {
-        return z[_this3.mappingKey('jan')] === jan;
+        return z[_this2.mappingKey('jan')] === jan;
       });
     }
   }, {
     key: 'findZaico',
     value: function findZaico(jan) {
-      var _this4 = this;
+      var _this3 = this;
 
       return this.context.data.find(function (z) {
-        return z[_this4.mappingKey('jan')] === jan;
+        return z[_this3.mappingKey('jan')] === jan;
       });
     }
   }, {
@@ -239,7 +182,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'isChangedData',
     value: function isChangedData() {
-      return JSON.stringify(this.context.data) !== JSON.stringify(this.context.orgData);
+      return !_lodash2.default.isEqual(this.context.data, this.context.orgData);
     }
   }, {
     key: 'canProcess',
@@ -305,7 +248,7 @@ var ZaioOpeBase = function () {
           while (1) {
             switch (_context3.prev = _context3.next) {
               case 0:
-                if (this.useCache() && this.isChangedData()) {
+                if (this.useCache() && this.isChangedData() && !this.options.dryrun) {
                   this.saveCacheData();
                 }
 
@@ -432,16 +375,14 @@ var ZaioOpeBase = function () {
     key: 'updateDatum',
     value: function () {
       var _ref11 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9(id) {
-        var _this5 = this;
-
         var del = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-        var headers, getRes, idx;
+        var getRes, idx;
         return regeneratorRuntime.wrap(function _callee9$(_context9) {
           while (1) {
             switch (_context9.prev = _context9.next) {
               case 0:
                 if (!this.useCache()) {
-                  _context9.next = 10;
+                  _context9.next = 9;
                   break;
                 }
 
@@ -453,20 +394,17 @@ var ZaioOpeBase = function () {
                 this.context.data = this.context.data.filter(function (row) {
                   return row.id !== id;
                 });
-                _context9.next = 10;
+                _context9.next = 9;
                 break;
 
               case 5:
-                headers = this.createRequestHeaders();
-                _context9.next = 8;
-                return _axios2.default.get(this.config.apiUrl + '/' + id, { headers: headers }).catch(function (e) {
-                  return _this5.err(e);
-                });
+                _context9.next = 7;
+                return this.requester.info(id);
 
-              case 8:
+              case 7:
                 getRes = _context9.sent;
 
-                if (getRes) {
+                if (!_lodash2.default.isEmpty(getRes)) {
                   idx = this.context.data.findIndex(function (row) {
                     return row.id === id;
                   });
@@ -478,7 +416,7 @@ var ZaioOpeBase = function () {
                   }
                 }
 
-              case 10:
+              case 9:
               case 'end':
                 return _context9.stop();
             }
@@ -495,64 +433,39 @@ var ZaioOpeBase = function () {
   }, {
     key: 'processFiles',
     value: function () {
-      var _ref12 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11(filePaths) {
-        var _this6 = this;
-
-        return regeneratorRuntime.wrap(function _callee11$(_context11) {
+      var _ref12 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10(filePaths) {
+        return regeneratorRuntime.wrap(function _callee10$(_context10) {
           while (1) {
-            switch (_context11.prev = _context11.next) {
+            switch (_context10.prev = _context10.next) {
               case 0:
                 if (this.canProcess(filePaths)) {
-                  _context11.next = 2;
+                  _context10.next = 2;
                   break;
                 }
 
-                return _context11.abrupt('return', false);
+                return _context10.abrupt('return', false);
 
               case 2:
-                _context11.next = 4;
+                _context10.next = 4;
                 return this.beforeFiles();
 
               case 4:
-                _context11.next = 6;
-                return (0, _pIteration.forEachSeries)(filePaths, function () {
-                  var _ref13 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10(f) {
-                    return regeneratorRuntime.wrap(function _callee10$(_context10) {
-                      while (1) {
-                        switch (_context10.prev = _context10.next) {
-                          case 0:
-                            _context10.next = 2;
-                            return _this6.processFile(f);
-
-                          case 2:
-                            return _context10.abrupt('return', _context10.sent);
-
-                          case 3:
-                          case 'end':
-                            return _context10.stop();
-                        }
-                      }
-                    }, _callee10, _this6);
-                  }));
-
-                  return function (_x4) {
-                    return _ref13.apply(this, arguments);
-                  };
-                }());
+                _context10.next = 6;
+                return this._processFiles(filePaths);
 
               case 6:
-                _context11.next = 8;
+                _context10.next = 8;
                 return this.afterFiles();
 
               case 8:
-                return _context11.abrupt('return', true);
+                return _context10.abrupt('return', true);
 
               case 9:
               case 'end':
-                return _context11.stop();
+                return _context10.stop();
             }
           }
-        }, _callee11, this);
+        }, _callee10, this);
       }));
 
       function processFiles(_x3) {
@@ -562,15 +475,65 @@ var ZaioOpeBase = function () {
       return processFiles;
     }()
   }, {
-    key: 'processFile',
+    key: '_processFiles',
     value: function () {
-      var _ref14 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(filePath) {
-        var _this7 = this;
+      var _ref13 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(filePaths) {
+        var _this4 = this;
+
+        return regeneratorRuntime.wrap(function _callee12$(_context12) {
+          while (1) {
+            switch (_context12.prev = _context12.next) {
+              case 0:
+                _context12.next = 2;
+                return (0, _pIteration.forEachSeries)(filePaths, function () {
+                  var _ref14 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11(f) {
+                    return regeneratorRuntime.wrap(function _callee11$(_context11) {
+                      while (1) {
+                        switch (_context11.prev = _context11.next) {
+                          case 0:
+                            _context11.next = 2;
+                            return _this4._processFile(f);
+
+                          case 2:
+                            return _context11.abrupt('return', _context11.sent);
+
+                          case 3:
+                          case 'end':
+                            return _context11.stop();
+                        }
+                      }
+                    }, _callee11, _this4);
+                  }));
+
+                  return function (_x5) {
+                    return _ref14.apply(this, arguments);
+                  };
+                }());
+
+              case 2:
+              case 'end':
+                return _context12.stop();
+            }
+          }
+        }, _callee12, this);
+      }));
+
+      function _processFiles(_x4) {
+        return _ref13.apply(this, arguments);
+      }
+
+      return _processFiles;
+    }()
+  }, {
+    key: '_processFile',
+    value: function () {
+      var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePath) {
+        var _this5 = this;
 
         var jangetterResult, rows;
-        return regeneratorRuntime.wrap(function _callee13$(_context13) {
+        return regeneratorRuntime.wrap(function _callee14$(_context14) {
           while (1) {
-            switch (_context13.prev = _context13.next) {
+            switch (_context14.prev = _context14.next) {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
@@ -580,52 +543,52 @@ var ZaioOpeBase = function () {
                 rows = jangetterResult.rows;
 
                 if (!Array.isArray(rows)) {
-                  _context13.next = 14;
+                  _context14.next = 14;
                   break;
                 }
 
-                _context13.next = 8;
+                _context14.next = 8;
                 return this.beforeRows(rows);
 
               case 8:
-                _context13.next = 10;
+                _context14.next = 10;
                 return (0, _pIteration.forEachSeries)(rows, function () {
-                  var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(row) {
-                    return regeneratorRuntime.wrap(function _callee12$(_context12) {
+                  var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row) {
+                    return regeneratorRuntime.wrap(function _callee13$(_context13) {
                       while (1) {
-                        switch (_context12.prev = _context12.next) {
+                        switch (_context13.prev = _context13.next) {
                           case 0:
-                            _context12.next = 2;
-                            return _this7.beforeRow(row);
+                            _context13.next = 2;
+                            return _this5.beforeRow(row);
 
                           case 2:
-                            _this7.log('*', row.title);
-                            _context12.next = 5;
-                            return _this7.eachRow(row);
+                            _this5.log('*', row.title);
+                            _context13.next = 5;
+                            return _this5.eachRow(row);
 
                           case 5:
-                            _context12.next = 7;
-                            return _this7.afterRow(row);
+                            _context13.next = 7;
+                            return _this5.afterRow(row);
 
                           case 7:
                           case 'end':
-                            return _context12.stop();
+                            return _context13.stop();
                         }
                       }
-                    }, _callee12, _this7);
+                    }, _callee13, _this5);
                   }));
 
-                  return function (_x6) {
-                    return _ref15.apply(this, arguments);
+                  return function (_x7) {
+                    return _ref16.apply(this, arguments);
                   };
                 }());
 
               case 10:
-                _context13.next = 12;
+                _context14.next = 12;
                 return this.afterRows(rows);
 
               case 12:
-                _context13.next = 15;
+                _context14.next = 15;
                 break;
 
               case 14:
@@ -633,17 +596,17 @@ var ZaioOpeBase = function () {
 
               case 15:
               case 'end':
-                return _context13.stop();
+                return _context14.stop();
             }
           }
-        }, _callee13, this);
+        }, _callee14, this);
       }));
 
-      function processFile(_x5) {
-        return _ref14.apply(this, arguments);
+      function _processFile(_x6) {
+        return _ref15.apply(this, arguments);
       }
 
-      return processFile;
+      return _processFile;
     }()
   }]);
 
@@ -675,11 +638,11 @@ var VerifyOperation = function (_ZaioOpeBase) {
   _createClass(VerifyOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(row) {
+      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(row) {
         var msgs, list, msg;
-        return regeneratorRuntime.wrap(function _callee14$(_context14) {
+        return regeneratorRuntime.wrap(function _callee15$(_context15) {
           while (1) {
-            switch (_context14.prev = _context14.next) {
+            switch (_context15.prev = _context15.next) {
               case 0:
                 msgs = ['未登録', '登録済み', '**複数登録済み**'];
                 list = this.listZaico(row.jan);
@@ -691,14 +654,14 @@ var VerifyOperation = function (_ZaioOpeBase) {
 
               case 4:
               case 'end':
-                return _context14.stop();
+                return _context15.stop();
             }
           }
-        }, _callee14, this);
+        }, _callee15, this);
       }));
 
-      function eachRow(_x7) {
-        return _ref16.apply(this, arguments);
+      function eachRow(_x8) {
+        return _ref17.apply(this, arguments);
       }
 
       return eachRow;
@@ -720,46 +683,46 @@ var AddOperation = function (_ZaioOpeBase2) {
   _createClass(AddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(row) {
-        var _this10 = this;
-
-        var headers, data, res;
-        return regeneratorRuntime.wrap(function _callee15$(_context15) {
+      var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(row) {
+        var data, res;
+        return regeneratorRuntime.wrap(function _callee16$(_context16) {
           while (1) {
-            switch (_context15.prev = _context15.next) {
+            switch (_context16.prev = _context16.next) {
               case 0:
-                headers = this.createRequestHeaders();
-                data = this.createRequestData('add', row);
-                // this.log(row,data);
-
-                _context15.next = 4;
-                return _axios2.default.post(this.config.apiUrl, data, { headers: headers }).catch(function (e) {
-                  return _this10.err(e);
-                });
-
-              case 4:
-                res = _context15.sent;
-
-                this.log('追加', row.jan, res.data.data_id);
-
-                if (!res) {
-                  _context15.next = 9;
+                if (!(!this.options.force && this.findZaico(row.jan))) {
+                  _context16.next = 3;
                   break;
                 }
 
-                _context15.next = 9;
+                this.log('すでにJANが登録されています', row.jan, row.title);
+                return _context16.abrupt('return');
+
+              case 3:
+                data = this.createRequestData('add', row);
+                _context16.next = 6;
+                return this.requester.add(data);
+
+              case 6:
+                res = _context16.sent;
+
+                if (_lodash2.default.isEmpty(res)) {
+                  _context16.next = 10;
+                  break;
+                }
+
+                _context16.next = 10;
                 return this.updateDatum(res.data.data_id);
 
-              case 9:
+              case 10:
               case 'end':
-                return _context15.stop();
+                return _context16.stop();
             }
           }
-        }, _callee15, this);
+        }, _callee16, this);
       }));
 
-      function eachRow(_x8) {
-        return _ref17.apply(this, arguments);
+      function eachRow(_x9) {
+        return _ref18.apply(this, arguments);
       }
 
       return eachRow;
@@ -781,58 +744,51 @@ var UpdateOperation = function (_ZaioOpeBase3) {
   _createClass(UpdateOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(row) {
-        var _this12 = this;
-
-        var found, headers, data, res;
-        return regeneratorRuntime.wrap(function _callee16$(_context16) {
+      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row) {
+        var found, data, res;
+        return regeneratorRuntime.wrap(function _callee17$(_context17) {
           while (1) {
-            switch (_context16.prev = _context16.next) {
+            switch (_context17.prev = _context17.next) {
               case 0:
                 found = this.findZaico(row.jan);
 
                 if (!found) {
-                  _context16.next = 13;
+                  _context17.next = 11;
                   break;
                 }
 
-                headers = this.createRequestHeaders();
-                data = this.createRequestData('update', row);
-                _context16.next = 6;
-                return _axios2.default.put(this.config.apiUrl + '/' + found.id, data, { headers: headers }).catch(function (e) {
-                  return _this12.err(e);
-                });
+                data = this.createRequestData('update', row, found);
+                _context17.next = 5;
+                return this.requester.update(found.id, data);
 
-              case 6:
-                res = _context16.sent;
+              case 5:
+                res = _context17.sent;
 
-                this.log('更新', row.jan, found.id);
-
-                if (!res) {
-                  _context16.next = 11;
+                if (_lodash2.default.isEmpty(res)) {
+                  _context17.next = 9;
                   break;
                 }
 
-                _context16.next = 11;
+                _context17.next = 9;
                 return this.updateDatum(found.id);
 
-              case 11:
-                _context16.next = 14;
+              case 9:
+                _context17.next = 12;
                 break;
 
-              case 13:
+              case 11:
                 this.log('未登録のため更新できません', row.jan, row.title);
 
-              case 14:
+              case 12:
               case 'end':
-                return _context16.stop();
+                return _context17.stop();
             }
           }
-        }, _callee16, this);
+        }, _callee17, this);
       }));
 
-      function eachRow(_x9) {
-        return _ref18.apply(this, arguments);
+      function eachRow(_x10) {
+        return _ref19.apply(this, arguments);
       }
 
       return eachRow;
@@ -854,76 +810,65 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
   _createClass(UpdateOrAddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row) {
-        var _this14 = this;
+      var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(row) {
+        var found, data, res, _data, _res;
 
-        var found, headers, data, res, _data, _res;
-
-        return regeneratorRuntime.wrap(function _callee17$(_context17) {
+        return regeneratorRuntime.wrap(function _callee18$(_context18) {
           while (1) {
-            switch (_context17.prev = _context17.next) {
+            switch (_context18.prev = _context18.next) {
               case 0:
                 found = this.findZaico(row.jan);
-                headers = this.createRequestHeaders();
 
                 if (!found) {
-                  _context17.next = 13;
+                  _context18.next = 11;
                   break;
                 }
 
-                data = this.createRequestData('update', row);
-                _context17.next = 6;
-                return _axios2.default.put(this.config.apiUrl + '/' + found.id, data, { headers: headers }).catch(function (e) {
-                  return _this14.err(e);
-                });
+                data = this.createRequestData('update', row, found);
+                _context18.next = 5;
+                return this.requester.update(found.id, data);
 
-              case 6:
-                res = _context17.sent;
+              case 5:
+                res = _context18.sent;
 
-                this.log('更新', row.jan, found.id);
-
-                if (!res) {
-                  _context17.next = 11;
+                if (_lodash2.default.isEmpty(res)) {
+                  _context18.next = 9;
                   break;
                 }
 
-                _context17.next = 11;
+                _context18.next = 9;
                 return this.updateDatum(found.id);
 
-              case 11:
-                _context17.next = 21;
+              case 9:
+                _context18.next = 18;
                 break;
 
-              case 13:
+              case 11:
                 _data = this.createRequestData('add', row);
-                _context17.next = 16;
-                return _axios2.default.post(this.config.apiUrl, _data, { headers: headers }).catch(function (e) {
-                  return _this14.err(e);
-                });
+                _context18.next = 14;
+                return this.requester.add(_data);
 
-              case 16:
-                _res = _context17.sent;
+              case 14:
+                _res = _context18.sent;
 
-                this.log('追加', row.jan, _res.data.data_id);
-
-                if (!_res) {
-                  _context17.next = 21;
+                if (_lodash2.default.isEmpty(_res)) {
+                  _context18.next = 18;
                   break;
                 }
 
-                _context17.next = 21;
+                _context18.next = 18;
                 return this.updateDatum(_res.data.data_id);
 
-              case 21:
+              case 18:
               case 'end':
-                return _context17.stop();
+                return _context18.stop();
             }
           }
-        }, _callee17, this);
+        }, _callee18, this);
       }));
 
-      function eachRow(_x10) {
-        return _ref19.apply(this, arguments);
+      function eachRow(_x11) {
+        return _ref20.apply(this, arguments);
       }
 
       return eachRow;
@@ -945,57 +890,50 @@ var DeleteOperation = function (_ZaioOpeBase5) {
   _createClass(DeleteOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(row) {
-        var _this16 = this;
-
-        var found, headers, res;
-        return regeneratorRuntime.wrap(function _callee18$(_context18) {
+      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19(row) {
+        var found, res;
+        return regeneratorRuntime.wrap(function _callee19$(_context19) {
           while (1) {
-            switch (_context18.prev = _context18.next) {
+            switch (_context19.prev = _context19.next) {
               case 0:
                 found = this.findZaico(row.jan);
 
                 if (!found) {
-                  _context18.next = 12;
+                  _context19.next = 10;
                   break;
                 }
 
-                headers = this.createRequestHeaders();
-                _context18.next = 5;
-                return _axios2.default.delete(this.config.apiUrl + '/' + found.id, { headers: headers }).catch(function (e) {
-                  return _this16.err(e);
-                });
+                _context19.next = 4;
+                return this.requester.remove(found.id, row.jan);
 
-              case 5:
-                res = _context18.sent;
+              case 4:
+                res = _context19.sent;
 
-                this.log('削除', row.jan, found.id);
-
-                if (!res) {
-                  _context18.next = 10;
+                if (_lodash2.default.isEmpty(res)) {
+                  _context19.next = 8;
                   break;
                 }
 
-                _context18.next = 10;
+                _context19.next = 8;
                 return this.updateDatum(found.id, true);
 
-              case 10:
-                _context18.next = 13;
+              case 8:
+                _context19.next = 11;
                 break;
 
-              case 12:
+              case 10:
                 this.log('未登録のため削除できません', row.jan, row.title);
 
-              case 13:
+              case 11:
               case 'end':
-                return _context18.stop();
+                return _context19.stop();
             }
           }
-        }, _callee18, this);
+        }, _callee19, this);
       }));
 
-      function eachRow(_x11) {
-        return _ref20.apply(this, arguments);
+      function eachRow(_x12) {
+        return _ref21.apply(this, arguments);
       }
 
       return eachRow;
@@ -1017,42 +955,21 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   _createClass(CacheUpdateOperation, [{
     key: 'beforeFiles',
     value: function () {
-      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19() {
-        var list;
-        return regeneratorRuntime.wrap(function _callee19$(_context19) {
-          while (1) {
-            switch (_context19.prev = _context19.next) {
-              case 0:
-                _context19.next = 2;
-                return this.getZaicoData();
-
-              case 2:
-                list = _context19.sent;
-
-                if (list) this.context.data = list;
-
-              case 4:
-              case 'end':
-                return _context19.stop();
-            }
-          }
-        }, _callee19, this);
-      }));
-
-      function beforeFiles() {
-        return _ref21.apply(this, arguments);
-      }
-
-      return beforeFiles;
-    }()
-  }, {
-    key: 'processFile',
-    value: function () {
       var _ref22 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20() {
+        var list;
         return regeneratorRuntime.wrap(function _callee20$(_context20) {
           while (1) {
             switch (_context20.prev = _context20.next) {
               case 0:
+                _context20.next = 2;
+                return this.getZaicoData();
+
+              case 2:
+                list = _context20.sent;
+
+                if (list) this.context.data = list;
+
+              case 4:
               case 'end':
                 return _context20.stop();
             }
@@ -1060,11 +977,32 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
         }, _callee20, this);
       }));
 
-      function processFile() {
+      function beforeFiles() {
         return _ref22.apply(this, arguments);
       }
 
-      return processFile;
+      return beforeFiles;
+    }()
+  }, {
+    key: '_processFiles',
+    value: function () {
+      var _ref23 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee21() {
+        return regeneratorRuntime.wrap(function _callee21$(_context21) {
+          while (1) {
+            switch (_context21.prev = _context21.next) {
+              case 0:
+              case 'end':
+                return _context21.stop();
+            }
+          }
+        }, _callee21, this);
+      }));
+
+      function _processFiles() {
+        return _ref23.apply(this, arguments);
+      }
+
+      return _processFiles;
     }()
   }, {
     key: 'useCache',
@@ -1084,6 +1022,138 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   }]);
 
   return CacheUpdateOperation;
+}(ZaioOpeBase);
+
+/**
+ * JANの重複を削除します。
+ * - JANが重複していること
+ * - 更新日時、作成日時が同じであること
+ */
+
+
+var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
+  _inherits(DeleteDuplicateOperation, _ZaioOpeBase7);
+
+  function DeleteDuplicateOperation() {
+    _classCallCheck(this, DeleteDuplicateOperation);
+
+    return _possibleConstructorReturn(this, (DeleteDuplicateOperation.__proto__ || Object.getPrototypeOf(DeleteDuplicateOperation)).apply(this, arguments));
+  }
+
+  _createClass(DeleteDuplicateOperation, [{
+    key: 'canProcess',
+    value: function canProcess() {
+      return true;
+    }
+  }, {
+    key: '_processFiles',
+    value: function () {
+      var _ref24 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
+        var _this13 = this;
+
+        var janKey, jan2DataArr, removeJan;
+        return regeneratorRuntime.wrap(function _callee24$(_context24) {
+          while (1) {
+            switch (_context24.prev = _context24.next) {
+              case 0:
+                janKey = this.mappingKey('jan');
+                jan2DataArr = this.context.data.reduce(function (o, val) {
+                  (o[val[janKey]] || (o[val[janKey]] = [])).push(val);
+                  return o;
+                }, {});
+                removeJan = _lodash2.default.toPairs(jan2DataArr).map(function (_ref25) {
+                  var _ref26 = _slicedToArray(_ref25, 2),
+                      jan = _ref26[0],
+                      arr = _ref26[1];
+
+                  if (arr.length === 1) return undefined;
+                  var data = arr.filter(function (v) {
+                    return v.created_at === v.updated_at;
+                  });
+                  if (!_this13.options.force && data.length === arr.length) {
+                    _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
+                      return v.id;
+                    }))));
+                    return undefined;
+                  }
+                  return { jan: jan, data: data };
+                }).filter(function (v) {
+                  return v !== undefined;
+                });
+                _context24.next = 5;
+                return (0, _pIteration.forEachSeries)(removeJan, function () {
+                  var _ref27 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee23(_ref28) {
+                    var jan = _ref28.jan,
+                        data = _ref28.data;
+                    return regeneratorRuntime.wrap(function _callee23$(_context23) {
+                      while (1) {
+                        switch (_context23.prev = _context23.next) {
+                          case 0:
+                            _context23.next = 2;
+                            return (0, _pIteration.forEachSeries)(data, function () {
+                              var _ref29 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee22(d) {
+                                var res;
+                                return regeneratorRuntime.wrap(function _callee22$(_context22) {
+                                  while (1) {
+                                    switch (_context22.prev = _context22.next) {
+                                      case 0:
+                                        _context22.next = 2;
+                                        return _this13.requester.remove(d.id, jan);
+
+                                      case 2:
+                                        res = _context22.sent;
+
+                                        if (_lodash2.default.isEmpty(res)) {
+                                          _context22.next = 6;
+                                          break;
+                                        }
+
+                                        _context22.next = 6;
+                                        return _this13.updateDatum(d.id, true);
+
+                                      case 6:
+                                      case 'end':
+                                        return _context22.stop();
+                                    }
+                                  }
+                                }, _callee22, _this13);
+                              }));
+
+                              return function (_x14) {
+                                return _ref29.apply(this, arguments);
+                              };
+                            }());
+
+                          case 2:
+                          case 'end':
+                            return _context23.stop();
+                        }
+                      }
+                    }, _callee23, _this13);
+                  }));
+
+                  return function (_x13) {
+                    return _ref27.apply(this, arguments);
+                  };
+                }());
+
+              case 5:
+              case 'end':
+                return _context24.stop();
+            }
+          }
+        }, _callee24, this);
+      }));
+
+      function _processFiles() {
+        return _ref24.apply(this, arguments);
+      }
+
+      return _processFiles;
+    }()
+  }]);
+
+  return DeleteDuplicateOperation;
 }(ZaioOpeBase);
 
 exports.default = {
@@ -1122,9 +1192,16 @@ exports.default = {
 
     return new (Function.prototype.bind.apply(DeleteOperation, [null].concat(args)))();
   },
-  cache: function cache() {
+  deleteDuplicate: function deleteDuplicate() {
     for (var _len6 = arguments.length, args = Array(_len6), _key6 = 0; _key6 < _len6; _key6++) {
       args[_key6] = arguments[_key6];
+    }
+
+    return new (Function.prototype.bind.apply(DeleteDuplicateOperation, [null].concat(args)))();
+  },
+  cache: function cache() {
+    for (var _len7 = arguments.length, args = Array(_len7), _key7 = 0; _key7 < _len7; _key7++) {
+      args[_key7] = arguments[_key7];
     }
 
     return new (Function.prototype.bind.apply(CacheUpdateOperation, [null].concat(args)))();
