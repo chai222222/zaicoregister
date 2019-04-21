@@ -62,7 +62,7 @@ class ZaioOpeBase {
   }
 
   replaceData(method, data, orgData) {
-    const refData = Object.assign({}, orgData, data);
+    const refData = Object.assign({}, orgData || {}, data);
     const replaceData = _.get(this.config, `replaceValue.${method}`);
     if (replaceData) {
       _.toPairs(replaceData).forEach(([k, v]) => {

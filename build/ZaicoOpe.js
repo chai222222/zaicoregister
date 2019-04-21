@@ -108,7 +108,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'replaceData',
     value: function replaceData(method, data, orgData) {
-      var refData = Object.assign({}, orgData, data);
+      var refData = Object.assign({}, orgData || {}, data);
       var replaceData = _lodash2.default.get(this.config, 'replaceValue.' + method);
       if (replaceData) {
         _lodash2.default.toPairs(replaceData).forEach(function (_ref3) {
