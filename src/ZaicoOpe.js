@@ -44,10 +44,13 @@ class ZaioOpeBase {
   createRequestData(method, data, found) {
     const init = _.cloneDeep(this.config.initialValue[method] || {});
     const convert = this.config.convert || {};
-    return this.assignData(_.fromPairs(_.toPairs(Object.assign(init, data)).map(([key,value]) => [
+    let newData = _.fromPairs(_.toPairs(Object.assign(init, data)).map(([key,value]) => [
       this.mappingKey(key),
       this.convert(convert[key], value),
-    ])));
+    ]));
+    newData = this.replaceData(method, newData, found);
+    newData = this.assignData(method, newData);
+    return newData;
   }
 
   log(...args) {
@@ -58,8 +61,34 @@ class ZaioOpeBase {
     return this.config.mapping[key] || key;
   }
 
-  assignData(data) {
-    // TODO: optional_attributes対策を考える
+  replaceData(method, data, orgData) {
+    const refData = Object.assign({}, orgData, data);
+    const replaceData = _.get(this.config, `replaceValue.${method}`);
+    if (replaceData) {
+      _.toPairs(replaceData).forEach(([k, v]) => {
+        if (!data[k] && refData[k] && Array.isArray(v)) {
+          data[k] = JSON.parse(v.reduce((cur, info) => {
+            if (Array.isArray(info.regexp) && typeof info.replace === 'string') {
+              const newRep = info.replace.replace(/\$\{(\w+)\}/g, (m, p1) => refData[p1] || '')
+              return cur.replace(new RegExp(...info.regexp), newRep);
+            }
+            return cur;
+          }, JSON.stringify(refData[k])));
+        }
+      });
+    }
+    return data;
+  }
+
+  assignData(method, data) {
+    const assignData = _.get(this.config, `assignValue.${method}`);
+    if (assignData) {
+      _.toPairs(assignData).forEach(([k, v]) => {
+        if (!data[k]) {
+          data[k] = JSON.parse(JSON.stringify(v).replace(/\$\{(\w+)\}/g, (m, p1) => data[p1] || ''));
+        }
+      })
+    }
     return data;
   }
 
@@ -213,8 +242,10 @@ class UpdateOperation extends ZaioOpeBase {
     const found = this.findZaico(row.jan);
     if (found) {
       const data = this.createRequestData('update', row, found);
-      const res = await this.requester.update(found.id, data);
-      if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      if (this.options.force || !_.toPairs(data).every(([k, v]) => _.isEqual(v, found[k]))) {
+        const res = await this.requester.update(found.id, data);
+        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      }
     } else {
       this.log('未登録のため更新できません', row.jan, row.title);
     }
@@ -226,8 +257,10 @@ class UpdateOrAddOperation extends ZaioOpeBase {
     const found = this.findZaico(row.jan);
     if (found) {
       const data = this.createRequestData('update', row, found);
-      const res = await this.requester.update(found.id, data);
-      if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      if (this.options.force || !_.toPairs(data).every(([k, v]) => _.isEqual(v, found[k]))) {
+        const res = await this.requester.update(found.id, data);
+        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      }
     } else {
       const data = this.createRequestData('add', row);
       const res = await this.requester.add(data);

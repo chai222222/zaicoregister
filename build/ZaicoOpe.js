@@ -36,13 +36,13 @@ var _ZaicoRequester2 = _interopRequireDefault(_ZaicoRequester);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -82,13 +82,16 @@ var ZaioOpeBase = function () {
 
       var init = _lodash2.default.cloneDeep(this.config.initialValue[method] || {});
       var convert = this.config.convert || {};
-      return this.assignData(_lodash2.default.fromPairs(_lodash2.default.toPairs(Object.assign(init, data)).map(function (_ref) {
+      var newData = _lodash2.default.fromPairs(_lodash2.default.toPairs(Object.assign(init, data)).map(function (_ref) {
         var _ref2 = _slicedToArray(_ref, 2),
             key = _ref2[0],
             value = _ref2[1];
 
         return [_this.mappingKey(key), _this.convert(convert[key], value)];
-      })));
+      }));
+      newData = this.replaceData(method, newData, found);
+      newData = this.assignData(method, newData);
+      return newData;
     }
   }, {
     key: 'log',
@@ -103,9 +106,48 @@ var ZaioOpeBase = function () {
       return this.config.mapping[key] || key;
     }
   }, {
+    key: 'replaceData',
+    value: function replaceData(method, data, orgData) {
+      var refData = Object.assign({}, orgData, data);
+      var replaceData = _lodash2.default.get(this.config, 'replaceValue.' + method);
+      if (replaceData) {
+        _lodash2.default.toPairs(replaceData).forEach(function (_ref3) {
+          var _ref4 = _slicedToArray(_ref3, 2),
+              k = _ref4[0],
+              v = _ref4[1];
+
+          if (!data[k] && refData[k] && Array.isArray(v)) {
+            data[k] = JSON.parse(v.reduce(function (cur, info) {
+              if (Array.isArray(info.regexp) && typeof info.replace === 'string') {
+                var newRep = info.replace.replace(/\$\{(\w+)\}/g, function (m, p1) {
+                  return refData[p1] || '';
+                });
+                return cur.replace(new (Function.prototype.bind.apply(RegExp, [null].concat(_toConsumableArray(info.regexp))))(), newRep);
+              }
+              return cur;
+            }, JSON.stringify(refData[k])));
+          }
+        });
+      }
+      return data;
+    }
+  }, {
     key: 'assignData',
-    value: function assignData(data) {
-      // TODO: optional_attributes対策を考える
+    value: function assignData(method, data) {
+      var assignData = _lodash2.default.get(this.config, 'assignValue.' + method);
+      if (assignData) {
+        _lodash2.default.toPairs(assignData).forEach(function (_ref5) {
+          var _ref6 = _slicedToArray(_ref5, 2),
+              k = _ref6[0],
+              v = _ref6[1];
+
+          if (!data[k]) {
+            data[k] = JSON.parse(JSON.stringify(v).replace(/\$\{(\w+)\}/g, function (m, p1) {
+              return data[p1] || '';
+            }));
+          }
+        });
+      }
       return data;
     }
   }, {
@@ -125,7 +167,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'getZaicoData',
     value: function () {
-      var _ref3 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+      var _ref7 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
@@ -146,7 +188,7 @@ var ZaioOpeBase = function () {
       }));
 
       function getZaicoData() {
-        return _ref3.apply(this, arguments);
+        return _ref7.apply(this, arguments);
       }
 
       return getZaicoData;
@@ -192,7 +234,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'beforeFiles',
     value: function () {
-      var _ref4 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
+      var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
         var list;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -235,7 +277,7 @@ var ZaioOpeBase = function () {
       }));
 
       function beforeFiles() {
-        return _ref4.apply(this, arguments);
+        return _ref8.apply(this, arguments);
       }
 
       return beforeFiles;
@@ -243,7 +285,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'afterFiles',
     value: function () {
-      var _ref5 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3() {
+      var _ref9 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3() {
         return regeneratorRuntime.wrap(function _callee3$(_context3) {
           while (1) {
             switch (_context3.prev = _context3.next) {
@@ -261,7 +303,7 @@ var ZaioOpeBase = function () {
       }));
 
       function afterFiles() {
-        return _ref5.apply(this, arguments);
+        return _ref9.apply(this, arguments);
       }
 
       return afterFiles;
@@ -269,7 +311,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'beforeRows',
     value: function () {
-      var _ref6 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee4() {
+      var _ref10 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee4() {
         return regeneratorRuntime.wrap(function _callee4$(_context4) {
           while (1) {
             switch (_context4.prev = _context4.next) {
@@ -282,7 +324,7 @@ var ZaioOpeBase = function () {
       }));
 
       function beforeRows() {
-        return _ref6.apply(this, arguments);
+        return _ref10.apply(this, arguments);
       }
 
       return beforeRows;
@@ -290,7 +332,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'afterRows',
     value: function () {
-      var _ref7 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5() {
+      var _ref11 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5() {
         return regeneratorRuntime.wrap(function _callee5$(_context5) {
           while (1) {
             switch (_context5.prev = _context5.next) {
@@ -303,7 +345,7 @@ var ZaioOpeBase = function () {
       }));
 
       function afterRows() {
-        return _ref7.apply(this, arguments);
+        return _ref11.apply(this, arguments);
       }
 
       return afterRows;
@@ -311,7 +353,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'beforeRow',
     value: function () {
-      var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee6() {
+      var _ref12 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee6() {
         return regeneratorRuntime.wrap(function _callee6$(_context6) {
           while (1) {
             switch (_context6.prev = _context6.next) {
@@ -324,7 +366,7 @@ var ZaioOpeBase = function () {
       }));
 
       function beforeRow() {
-        return _ref8.apply(this, arguments);
+        return _ref12.apply(this, arguments);
       }
 
       return beforeRow;
@@ -332,7 +374,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'afterRow',
     value: function () {
-      var _ref9 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee7() {
+      var _ref13 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee7() {
         return regeneratorRuntime.wrap(function _callee7$(_context7) {
           while (1) {
             switch (_context7.prev = _context7.next) {
@@ -345,7 +387,7 @@ var ZaioOpeBase = function () {
       }));
 
       function afterRow() {
-        return _ref9.apply(this, arguments);
+        return _ref13.apply(this, arguments);
       }
 
       return afterRow;
@@ -353,7 +395,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'eachRow',
     value: function () {
-      var _ref10 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee8() {
+      var _ref14 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee8() {
         return regeneratorRuntime.wrap(function _callee8$(_context8) {
           while (1) {
             switch (_context8.prev = _context8.next) {
@@ -366,7 +408,7 @@ var ZaioOpeBase = function () {
       }));
 
       function eachRow() {
-        return _ref10.apply(this, arguments);
+        return _ref14.apply(this, arguments);
       }
 
       return eachRow;
@@ -374,7 +416,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'updateDatum',
     value: function () {
-      var _ref11 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9(id) {
+      var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9(id) {
         var del = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
         var getRes, idx;
         return regeneratorRuntime.wrap(function _callee9$(_context9) {
@@ -425,7 +467,7 @@ var ZaioOpeBase = function () {
       }));
 
       function updateDatum(_x) {
-        return _ref11.apply(this, arguments);
+        return _ref15.apply(this, arguments);
       }
 
       return updateDatum;
@@ -433,7 +475,7 @@ var ZaioOpeBase = function () {
   }, {
     key: 'processFiles',
     value: function () {
-      var _ref12 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10(filePaths) {
+      var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10(filePaths) {
         return regeneratorRuntime.wrap(function _callee10$(_context10) {
           while (1) {
             switch (_context10.prev = _context10.next) {
@@ -469,7 +511,7 @@ var ZaioOpeBase = function () {
       }));
 
       function processFiles(_x3) {
-        return _ref12.apply(this, arguments);
+        return _ref16.apply(this, arguments);
       }
 
       return processFiles;
@@ -477,7 +519,7 @@ var ZaioOpeBase = function () {
   }, {
     key: '_processFiles',
     value: function () {
-      var _ref13 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(filePaths) {
+      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(filePaths) {
         var _this4 = this;
 
         return regeneratorRuntime.wrap(function _callee12$(_context12) {
@@ -486,7 +528,7 @@ var ZaioOpeBase = function () {
               case 0:
                 _context12.next = 2;
                 return (0, _pIteration.forEachSeries)(filePaths, function () {
-                  var _ref14 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11(f) {
+                  var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11(f) {
                     return regeneratorRuntime.wrap(function _callee11$(_context11) {
                       while (1) {
                         switch (_context11.prev = _context11.next) {
@@ -506,7 +548,7 @@ var ZaioOpeBase = function () {
                   }));
 
                   return function (_x5) {
-                    return _ref14.apply(this, arguments);
+                    return _ref18.apply(this, arguments);
                   };
                 }());
 
@@ -519,7 +561,7 @@ var ZaioOpeBase = function () {
       }));
 
       function _processFiles(_x4) {
-        return _ref13.apply(this, arguments);
+        return _ref17.apply(this, arguments);
       }
 
       return _processFiles;
@@ -527,7 +569,7 @@ var ZaioOpeBase = function () {
   }, {
     key: '_processFile',
     value: function () {
-      var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePath) {
+      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePath) {
         var _this5 = this;
 
         var jangetterResult, rows;
@@ -553,7 +595,7 @@ var ZaioOpeBase = function () {
               case 8:
                 _context14.next = 10;
                 return (0, _pIteration.forEachSeries)(rows, function () {
-                  var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row) {
+                  var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row) {
                     return regeneratorRuntime.wrap(function _callee13$(_context13) {
                       while (1) {
                         switch (_context13.prev = _context13.next) {
@@ -579,7 +621,7 @@ var ZaioOpeBase = function () {
                   }));
 
                   return function (_x7) {
-                    return _ref16.apply(this, arguments);
+                    return _ref20.apply(this, arguments);
                   };
                 }());
 
@@ -603,7 +645,7 @@ var ZaioOpeBase = function () {
       }));
 
       function _processFile(_x6) {
-        return _ref15.apply(this, arguments);
+        return _ref19.apply(this, arguments);
       }
 
       return _processFile;
@@ -638,7 +680,7 @@ var VerifyOperation = function (_ZaioOpeBase) {
   _createClass(VerifyOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(row) {
+      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(row) {
         var msgs, list, msg;
         return regeneratorRuntime.wrap(function _callee15$(_context15) {
           while (1) {
@@ -661,7 +703,7 @@ var VerifyOperation = function (_ZaioOpeBase) {
       }));
 
       function eachRow(_x8) {
-        return _ref17.apply(this, arguments);
+        return _ref21.apply(this, arguments);
       }
 
       return eachRow;
@@ -683,7 +725,7 @@ var AddOperation = function (_ZaioOpeBase2) {
   _createClass(AddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(row) {
+      var _ref22 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(row) {
         var data, res;
         return regeneratorRuntime.wrap(function _callee16$(_context16) {
           while (1) {
@@ -722,7 +764,7 @@ var AddOperation = function (_ZaioOpeBase2) {
       }));
 
       function eachRow(_x9) {
-        return _ref18.apply(this, arguments);
+        return _ref22.apply(this, arguments);
       }
 
       return eachRow;
@@ -744,7 +786,7 @@ var UpdateOperation = function (_ZaioOpeBase3) {
   _createClass(UpdateOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row) {
+      var _ref23 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row) {
         var found, data, res;
         return regeneratorRuntime.wrap(function _callee17$(_context17) {
           while (1) {
@@ -753,33 +795,45 @@ var UpdateOperation = function (_ZaioOpeBase3) {
                 found = this.findZaico(row.jan);
 
                 if (!found) {
-                  _context17.next = 11;
+                  _context17.next = 12;
                   break;
                 }
 
                 data = this.createRequestData('update', row, found);
-                _context17.next = 5;
-                return this.requester.update(found.id, data);
 
-              case 5:
-                res = _context17.sent;
+                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref24) {
+                  var _ref25 = _slicedToArray(_ref24, 2),
+                      k = _ref25[0],
+                      v = _ref25[1];
 
-                if (_lodash2.default.isEmpty(res)) {
-                  _context17.next = 9;
+                  return _lodash2.default.isEqual(v, found[k]);
+                }))) {
+                  _context17.next = 10;
                   break;
                 }
 
-                _context17.next = 9;
+                _context17.next = 6;
+                return this.requester.update(found.id, data);
+
+              case 6:
+                res = _context17.sent;
+
+                if (_lodash2.default.isEmpty(res)) {
+                  _context17.next = 10;
+                  break;
+                }
+
+                _context17.next = 10;
                 return this.updateDatum(found.id);
 
-              case 9:
-                _context17.next = 12;
+              case 10:
+                _context17.next = 13;
                 break;
 
-              case 11:
+              case 12:
                 this.log('未登録のため更新できません', row.jan, row.title);
 
-              case 12:
+              case 13:
               case 'end':
                 return _context17.stop();
             }
@@ -788,7 +842,7 @@ var UpdateOperation = function (_ZaioOpeBase3) {
       }));
 
       function eachRow(_x10) {
-        return _ref19.apply(this, arguments);
+        return _ref23.apply(this, arguments);
       }
 
       return eachRow;
@@ -810,7 +864,7 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
   _createClass(UpdateOrAddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(row) {
+      var _ref26 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(row) {
         var found, data, res, _data, _res;
 
         return regeneratorRuntime.wrap(function _callee18$(_context18) {
@@ -820,46 +874,58 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
                 found = this.findZaico(row.jan);
 
                 if (!found) {
-                  _context18.next = 11;
+                  _context18.next = 12;
                   break;
                 }
 
                 data = this.createRequestData('update', row, found);
-                _context18.next = 5;
+
+                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref27) {
+                  var _ref28 = _slicedToArray(_ref27, 2),
+                      k = _ref28[0],
+                      v = _ref28[1];
+
+                  return _lodash2.default.isEqual(v, found[k]);
+                }))) {
+                  _context18.next = 10;
+                  break;
+                }
+
+                _context18.next = 6;
                 return this.requester.update(found.id, data);
 
-              case 5:
+              case 6:
                 res = _context18.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context18.next = 9;
+                  _context18.next = 10;
                   break;
                 }
 
-                _context18.next = 9;
+                _context18.next = 10;
                 return this.updateDatum(found.id);
 
-              case 9:
-                _context18.next = 18;
+              case 10:
+                _context18.next = 19;
                 break;
 
-              case 11:
+              case 12:
                 _data = this.createRequestData('add', row);
-                _context18.next = 14;
+                _context18.next = 15;
                 return this.requester.add(_data);
 
-              case 14:
+              case 15:
                 _res = _context18.sent;
 
                 if (_lodash2.default.isEmpty(_res)) {
-                  _context18.next = 18;
+                  _context18.next = 19;
                   break;
                 }
 
-                _context18.next = 18;
+                _context18.next = 19;
                 return this.updateDatum(_res.data.data_id);
 
-              case 18:
+              case 19:
               case 'end':
                 return _context18.stop();
             }
@@ -868,7 +934,7 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
       }));
 
       function eachRow(_x11) {
-        return _ref20.apply(this, arguments);
+        return _ref26.apply(this, arguments);
       }
 
       return eachRow;
@@ -890,7 +956,7 @@ var DeleteOperation = function (_ZaioOpeBase5) {
   _createClass(DeleteOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19(row) {
+      var _ref29 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19(row) {
         var found, res;
         return regeneratorRuntime.wrap(function _callee19$(_context19) {
           while (1) {
@@ -933,7 +999,7 @@ var DeleteOperation = function (_ZaioOpeBase5) {
       }));
 
       function eachRow(_x12) {
-        return _ref21.apply(this, arguments);
+        return _ref29.apply(this, arguments);
       }
 
       return eachRow;
@@ -955,7 +1021,7 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   _createClass(CacheUpdateOperation, [{
     key: 'beforeFiles',
     value: function () {
-      var _ref22 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20() {
+      var _ref30 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20() {
         var list;
         return regeneratorRuntime.wrap(function _callee20$(_context20) {
           while (1) {
@@ -978,7 +1044,7 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
       }));
 
       function beforeFiles() {
-        return _ref22.apply(this, arguments);
+        return _ref30.apply(this, arguments);
       }
 
       return beforeFiles;
@@ -986,7 +1052,7 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   }, {
     key: '_processFiles',
     value: function () {
-      var _ref23 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee21() {
+      var _ref31 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee21() {
         return regeneratorRuntime.wrap(function _callee21$(_context21) {
           while (1) {
             switch (_context21.prev = _context21.next) {
@@ -999,7 +1065,7 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
       }));
 
       function _processFiles() {
-        return _ref23.apply(this, arguments);
+        return _ref31.apply(this, arguments);
       }
 
       return _processFiles;
@@ -1048,7 +1114,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
   }, {
     key: '_processFiles',
     value: function () {
-      var _ref24 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
+      var _ref32 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
         var _this13 = this;
 
         var janKey, jan2DataArr, removeJan;
@@ -1061,10 +1127,10 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                   (o[val[janKey]] || (o[val[janKey]] = [])).push(val);
                   return o;
                 }, {});
-                removeJan = _lodash2.default.toPairs(jan2DataArr).map(function (_ref25) {
-                  var _ref26 = _slicedToArray(_ref25, 2),
-                      jan = _ref26[0],
-                      arr = _ref26[1];
+                removeJan = _lodash2.default.toPairs(jan2DataArr).map(function (_ref33) {
+                  var _ref34 = _slicedToArray(_ref33, 2),
+                      jan = _ref34[0],
+                      arr = _ref34[1];
 
                   if (arr.length === 1) return undefined;
                   var data = arr.filter(function (v) {
@@ -1082,16 +1148,16 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                 });
                 _context24.next = 5;
                 return (0, _pIteration.forEachSeries)(removeJan, function () {
-                  var _ref27 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee23(_ref28) {
-                    var jan = _ref28.jan,
-                        data = _ref28.data;
+                  var _ref35 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee23(_ref36) {
+                    var jan = _ref36.jan,
+                        data = _ref36.data;
                     return regeneratorRuntime.wrap(function _callee23$(_context23) {
                       while (1) {
                         switch (_context23.prev = _context23.next) {
                           case 0:
                             _context23.next = 2;
                             return (0, _pIteration.forEachSeries)(data, function () {
-                              var _ref29 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee22(d) {
+                              var _ref37 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee22(d) {
                                 var res;
                                 return regeneratorRuntime.wrap(function _callee22$(_context22) {
                                   while (1) {
@@ -1120,7 +1186,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                               }));
 
                               return function (_x14) {
-                                return _ref29.apply(this, arguments);
+                                return _ref37.apply(this, arguments);
                               };
                             }());
 
@@ -1133,7 +1199,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                   }));
 
                   return function (_x13) {
-                    return _ref27.apply(this, arguments);
+                    return _ref35.apply(this, arguments);
                   };
                 }());
 
@@ -1146,7 +1212,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
       }));
 
       function _processFiles() {
-        return _ref24.apply(this, arguments);
+        return _ref32.apply(this, arguments);
       }
 
       return _processFiles;
