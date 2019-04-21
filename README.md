@@ -5,7 +5,7 @@ zaico登録コマンド
 ## 使い方
 
 ```
-Usage: zaicoregister [options]
+Usage: zaicoregister [options] [files...]
 
 	--help, -h
 		Displays help information about this script
@@ -45,3 +45,37 @@ Usage: zaicoregister [options]
   - ```-f``` オプションをつけた場合、JANが存在しても追加する
 - deleteDuplicate はキャッシュデータの重複がある場合、作成時と更新時が違うデータが１つ以上ある場合に作成日時と更新日時が同じデータを削除する
   - ```-f``` オプションをつけると、作成日時と更新日時が違うデータがなくても削除する（つまり対象のJANはなくなる）
+
+
+#### 例
+
+キャッシュを更新
+
+```
+zaicoregister -m cache
+```
+
+zaico追加・削除・更新
+
+```
+zaicoregister -c -m add jangetterの出力data.json       # JANが重複してるものは追加しない
+zaicoregister -f -c -m add jangetterの出力data.json    # JANが重複していても追加する
+zaicoregister -c -m update jangetterの出力data.json    # JANが見つからないものはエラー、あれば更新
+zaicoregister -c -m updateAdd jangetterの出力data.json # JANがあれば更新、なければ追加
+zaicoregister -c -m delete jangetterの出力data.json    # JANが見つからないものはエラー、あれば削除
+```
+
+※ -c をつけない場合には全データをzaicoから都度とってくるので頻繁にやる場合にはキャッシュを使うこと
+
+dryrun
+
+```
+zaicoregister -c -m delete jangetterの出力data.json    # 実際にサーバーからは削除されない
+```
+
+重複削除
+
+```
+zaicoregister -c -m deleteDuplicate    # 重複削除。更新日時と作成日時が別のものがないものは削除しない
+zaicoregister -f -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがないものも削除
+```
