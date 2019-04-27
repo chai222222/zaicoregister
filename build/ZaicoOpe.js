@@ -1136,11 +1136,27 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                   var data = arr.filter(function (v) {
                     return v.created_at === v.updated_at;
                   });
-                  if (!_this13.options.force && data.length === arr.length) {
-                    _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
+                  if (data.length === arr.length) {
+                    var _options = _this13.options,
+                        latest = _options.latest,
+                        oldest = _options.oldest,
+                        force = _options.force;
+
+                    if (latest) return { jan: jan, data: data.slice(0, data.length - 1) };
+                    if (oldest) return { jan: jan, data: data.slice(1, data.length) };
+                    if (!force) {
+                      _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
+                        return v.id;
+                      }))));
+                      return undefined;
+                    }
+                  } else if (data.length - arr.length > 1) {
+                    var res = arr.filter(function (v) {
+                      return v.created_at !== v.updated_at;
+                    });
+                    _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306B\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u9055\u3046\u3082\u306E\u304C\u8907\u6570\u542B\u307E\u308C\u307E\u3059\u3002\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u66F4\u65B0\u3057\u3001verify\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055[' + jan + ']'].concat(_toConsumableArray(res.map(function (v) {
                       return v.id;
                     }))));
-                    return undefined;
                   }
                   return { jan: jan, data: data };
                 }).filter(function (v) {

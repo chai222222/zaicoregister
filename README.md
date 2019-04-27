@@ -9,7 +9,7 @@ Usage: zaicoregister [options] [files...]
 
 	--help, -h
 		Displays help information about this script
-		'index.js -h' or 'index.js --help'
+		'zicoregister -h' or 'zicoregister --help'
 
 	--cache, -c
 		enable cache
@@ -19,6 +19,12 @@ Usage: zaicoregister [options] [files...]
 
 	--force, -f
 		force mode
+
+	--latest
+		keep latest in deleteDuplicate mode
+
+	--oldest
+		keep oldest in deleteDuplicate mode
 
 	--mode, -m
 		run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate
@@ -37,6 +43,8 @@ Usage: zaicoregister [options] [files...]
 | cache     | cacheファイルのみを更新する |
 | deleteDuplicate | 重複データを削除する |
 | dryrun    | ドライランモード。追加・削除・更新のリクエストはされないのでサーバーのデータは変わらない |
+| oldest    | 重複削除モードの場合、全てが削除対象の場合に一番古いデータを残す |
+| latest    | 重複削除モードの場合、全てが削除対象の場合に一番新しいデータを残す |
 
 - add, update, delete, updateAdd では処理前に全データを全て取得する
   -　```-c``` オプションをつけた場合、キャッシュファイルがあればデータはそこから取得し、処理後に更新する
@@ -44,7 +52,9 @@ Usage: zaicoregister [options] [files...]
 - add ではデフォルトはJANが存在するデータはメッセージを表示して登録しない
   - ```-f``` オプションをつけた場合、JANが存在しても追加する
 - deleteDuplicate はキャッシュデータの重複がある場合、作成時と更新時が違うデータが１つ以上ある場合に作成日時と更新日時が同じデータを削除する
-  - ```-f``` オプションをつけると、作成日時と更新日時が違うデータがなくても削除する（つまり対象のJANはなくなる）
+  - ```-f``` オプションをつけると、作成日時と更新日時が全て同じでも削除する（つまり対象のJANはなくなる）
+  - ```--oldest``` オプションをつけると、作成日時と更新日時が全て同じでも一番古いもの以外は削除する
+  - ```--latest``` オプションをつけると、作成日時と更新日時が全て同じでも一番新しいもの以外は削除する
 
 
 #### 例
@@ -76,6 +86,8 @@ zaicoregister -c -m delete jangetterの出力data.json    # 実際にサーバ�
 重複削除
 
 ```
-zaicoregister -c -m deleteDuplicate    # 重複削除。更新日時と作成日時が別のものがないものは削除しない
-zaicoregister -f -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがないものも削除
+zaicoregister -c -m deleteDuplicate         # 重複削除。更新日時と作成日時が別のものがないものは削除しない
+zaicoregister -f -c -m deleteDuplicate      # 重複削除。更新日時と作成日時が別のものがない場合も全て削除する
+zaicoregister -oldest -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがない場合、最古のデータ以外は削除
+zaicoregister -latest -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがない場合、最新のデータ以外は削除
 ```

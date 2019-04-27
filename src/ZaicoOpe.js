@@ -322,9 +322,17 @@ class DeleteDuplicateOperation extends ZaioOpeBase {
     const removeJan = _.toPairs(jan2DataArr).map(([jan, arr]) => {
       if (arr.length === 1) return undefined;
       const data = arr.filter(v => v.created_at === v.updated_at);
-      if (!this.options.force && data.length === arr.length) {
-        this.log(`重複したJANの全てが作成日・修正日が同じです[${jan}]`, ...arr.map(v => v.id));
-        return undefined;
+      if (data.length === arr.length) {
+        const { latest, oldest, force } = this.options;
+        if (latest) return ({ jan, data: data.slice(0, data.length - 1) });
+        if (oldest) return ({ jan, data: data.slice(1, data.length) });
+        if (!force) {
+          this.log(`重複したJANの全てが作成日・修正日が同じです[${jan}]`, ...arr.map(v => v.id));
+          return undefined;
+        }
+      } else if (data.length - arr.length > 1) {
+        const res = arr.filter(v => v.created_at !== v.updated_at);
+        this.log(`重複したJANに作成日・修正日が違うものが複数含まれます。キャッシュを更新し、verifyで確認してくださ[${jan}]`, ...res.map(v => v.id));
       }
       return ({ jan, data });
     }).filter(v => v !== undefined);

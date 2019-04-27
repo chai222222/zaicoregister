@@ -31,6 +31,14 @@ var fixedArgs = [{
   type: 'boolean',
   description: 'force mode'
 }, {
+  name: 'latest',
+  type: 'boolean',
+  description: 'keep latest in deleteDuplicate mode'
+}, {
+  name: 'oldest',
+  type: 'boolean',
+  description: 'keep oldest in deleteDuplicate mode'
+}, {
   name: 'mode',
   short: 'm',
   type: 'string',
