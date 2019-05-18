@@ -16,6 +16,11 @@ var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var modeHelp = Object.keys(_ZaicoOpe2.default).map(function (v, idx) {
+  return idx ? v : v + '(default)';
+}).join(', '); // eslint-disable-line import/no-extraneous-dependencies
+
+
 var fixedArgs = [{
   name: 'cache',
   short: 'c',
@@ -42,16 +47,16 @@ var fixedArgs = [{
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate'
-}]; // eslint-disable-line import/no-extraneous-dependencies
-
+  description: 'run mode. ' + modeHelp
+}];
 
 _argv2.default.option([].concat(fixedArgs));
 var args = _argv2.default.run();
-var mode = args.options.mode || 'verify';
+var mode = args.options.mode || Object.keys(_ZaicoOpe2.default).shift();
 var opeCreator = _ZaicoOpe2.default[mode];
 
 if (!opeCreator) {
+  console.log('mode[' + mode + ']\u304C\u5B9A\u7FA9\u3055\u308C\u3066\u3044\u307E\u305B\u3093');
   _argv2.default.help();
   process.exit(1);
 } else {

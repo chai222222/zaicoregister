@@ -3,6 +3,10 @@ import argv from 'argv';
 import ZaicoOpes from './ZaicoOpe';
 import JsonUtil from './util/JsonUtil'
 
+const modeHelp = Object.keys(ZaicoOpes)
+  .map((v, idx) => idx ? v : `${v}(default)`)
+  .join(', ');
+
 const fixedArgs = [ {
   name: 'cache',
   short: 'c',
@@ -29,15 +33,16 @@ const fixedArgs = [ {
   name: 'mode',
   short: 'm',
   type: 'string',
-  description: 'run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate',
+  description: `run mode. ${modeHelp}`,
 } ];
 
 argv.option([ ...fixedArgs]);
 const args = argv.run();
-const mode = args.options.mode || 'verify';
+const mode = args.options.mode || Object.keys(ZaicoOpes).shift();
 const opeCreator = ZaicoOpes[mode];
 
 if (!opeCreator) {
+  console.log(`mode[${mode}]が定義されていません`);
   argv.help();
   process.exit(1);
 } else {

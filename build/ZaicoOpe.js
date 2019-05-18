@@ -208,13 +208,16 @@ var ZaioOpeBase = function () {
       });
     }
   }, {
+    key: 'findZaicoByKey',
+    value: function findZaicoByKey(value, key) {
+      return this.context.data.find(function (z) {
+        return z[key] === value;
+      });
+    }
+  }, {
     key: 'findZaico',
     value: function findZaico(jan) {
-      var _this3 = this;
-
-      return this.context.data.find(function (z) {
-        return z[_this3.mappingKey('jan')] === jan;
-      });
+      return this.findZaicoByKey(jan, this.mappingKey('jan'));
     }
   }, {
     key: 'cloneData',
@@ -520,7 +523,7 @@ var ZaioOpeBase = function () {
     key: '_processFiles',
     value: function () {
       var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(filePaths) {
-        var _this4 = this;
+        var _this3 = this;
 
         return regeneratorRuntime.wrap(function _callee12$(_context12) {
           while (1) {
@@ -534,7 +537,7 @@ var ZaioOpeBase = function () {
                         switch (_context11.prev = _context11.next) {
                           case 0:
                             _context11.next = 2;
-                            return _this4._processFile(f);
+                            return _this3._processFile(f);
 
                           case 2:
                             return _context11.abrupt('return', _context11.sent);
@@ -544,7 +547,7 @@ var ZaioOpeBase = function () {
                             return _context11.stop();
                         }
                       }
-                    }, _callee11, _this4);
+                    }, _callee11, _this3);
                   }));
 
                   return function (_x5) {
@@ -570,7 +573,7 @@ var ZaioOpeBase = function () {
     key: '_processFile',
     value: function () {
       var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePath) {
-        var _this5 = this;
+        var _this4 = this;
 
         var jangetterResult, rows;
         return regeneratorRuntime.wrap(function _callee14$(_context14) {
@@ -595,32 +598,32 @@ var ZaioOpeBase = function () {
               case 8:
                 _context14.next = 10;
                 return (0, _pIteration.forEachSeries)(rows, function () {
-                  var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row) {
+                  var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row, idx) {
                     return regeneratorRuntime.wrap(function _callee13$(_context13) {
                       while (1) {
                         switch (_context13.prev = _context13.next) {
                           case 0:
                             _context13.next = 2;
-                            return _this5.beforeRow(row);
+                            return _this4.beforeRow(row);
 
                           case 2:
-                            _this5.log('*', row.title);
+                            _this4.log('* [' + (idx + 1) + '/' + rows.length + ']', row.title);
                             _context13.next = 5;
-                            return _this5.eachRow(row);
+                            return _this4.eachRow(row);
 
                           case 5:
                             _context13.next = 7;
-                            return _this5.afterRow(row);
+                            return _this4.afterRow(row);
 
                           case 7:
                           case 'end':
                             return _context13.stop();
                         }
                       }
-                    }, _callee13, _this5);
+                    }, _callee13, _this4);
                   }));
 
-                  return function (_x7) {
+                  return function (_x7, _x8) {
                     return _ref20.apply(this, arguments);
                   };
                 }());
@@ -702,7 +705,7 @@ var VerifyOperation = function (_ZaioOpeBase) {
         }, _callee15, this);
       }));
 
-      function eachRow(_x8) {
+      function eachRow(_x9) {
         return _ref21.apply(this, arguments);
       }
 
@@ -763,7 +766,7 @@ var AddOperation = function (_ZaioOpeBase2) {
         }, _callee16, this);
       }));
 
-      function eachRow(_x9) {
+      function eachRow(_x10) {
         return _ref22.apply(this, arguments);
       }
 
@@ -841,7 +844,7 @@ var UpdateOperation = function (_ZaioOpeBase3) {
         }, _callee17, this);
       }));
 
-      function eachRow(_x10) {
+      function eachRow(_x11) {
         return _ref23.apply(this, arguments);
       }
 
@@ -933,7 +936,7 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
         }, _callee18, this);
       }));
 
-      function eachRow(_x11) {
+      function eachRow(_x12) {
         return _ref26.apply(this, arguments);
       }
 
@@ -998,7 +1001,7 @@ var DeleteOperation = function (_ZaioOpeBase5) {
         }, _callee19, this);
       }));
 
-      function eachRow(_x12) {
+      function eachRow(_x13) {
         return _ref29.apply(this, arguments);
       }
 
@@ -1115,7 +1118,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
     key: '_processFiles',
     value: function () {
       var _ref32 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
-        var _this13 = this;
+        var _this12 = this;
 
         var janKey, jan2DataArr, removeJan;
         return regeneratorRuntime.wrap(function _callee24$(_context24) {
@@ -1137,7 +1140,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     return v.created_at === v.updated_at;
                   });
                   if (data.length === arr.length) {
-                    var _options = _this13.options,
+                    var _options = _this12.options,
                         latest = _options.latest,
                         oldest = _options.oldest,
                         force = _options.force;
@@ -1145,7 +1148,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     if (latest) return { jan: jan, data: data.slice(0, data.length - 1) };
                     if (oldest) return { jan: jan, data: data.slice(1, data.length) };
                     if (!force) {
-                      _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
+                      _this12.log.apply(_this12, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
                         return v.id;
                       }))));
                       return undefined;
@@ -1154,7 +1157,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     var res = arr.filter(function (v) {
                       return v.created_at !== v.updated_at;
                     });
-                    _this13.log.apply(_this13, ['\u91CD\u8907\u3057\u305FJAN\u306B\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u9055\u3046\u3082\u306E\u304C\u8907\u6570\u542B\u307E\u308C\u307E\u3059\u3002\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u66F4\u65B0\u3057\u3001verify\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055[' + jan + ']'].concat(_toConsumableArray(res.map(function (v) {
+                    _this12.log.apply(_this12, ['\u91CD\u8907\u3057\u305FJAN\u306B\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u9055\u3046\u3082\u306E\u304C\u8907\u6570\u542B\u307E\u308C\u307E\u3059\u3002\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u66F4\u65B0\u3057\u3001verify\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055[' + jan + ']'].concat(_toConsumableArray(res.map(function (v) {
                       return v.id;
                     }))));
                   }
@@ -1180,7 +1183,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                                     switch (_context22.prev = _context22.next) {
                                       case 0:
                                         _context22.next = 2;
-                                        return _this13.requester.remove(d.id, jan);
+                                        return _this12.requester.remove(d.id, jan);
 
                                       case 2:
                                         res = _context22.sent;
@@ -1191,17 +1194,17 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                                         }
 
                                         _context22.next = 6;
-                                        return _this13.updateDatum(d.id, true);
+                                        return _this12.updateDatum(d.id, true);
 
                                       case 6:
                                       case 'end':
                                         return _context22.stop();
                                     }
                                   }
-                                }, _callee22, _this13);
+                                }, _callee22, _this12);
                               }));
 
-                              return function (_x14) {
+                              return function (_x15) {
                                 return _ref37.apply(this, arguments);
                               };
                             }());
@@ -1211,10 +1214,10 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                             return _context23.stop();
                         }
                       }
-                    }, _callee23, _this13);
+                    }, _callee23, _this12);
                   }));
 
-                  return function (_x13) {
+                  return function (_x14) {
                     return _ref35.apply(this, arguments);
                   };
                 }());
@@ -1237,6 +1240,180 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
 
   return DeleteDuplicateOperation;
 }(ZaioOpeBase);
+
+var CacheFileOperationBase = function (_ZaioOpeBase8) {
+  _inherits(CacheFileOperationBase, _ZaioOpeBase8);
+
+  function CacheFileOperationBase() {
+    _classCallCheck(this, CacheFileOperationBase);
+
+    return _possibleConstructorReturn(this, (CacheFileOperationBase.__proto__ || Object.getPrototypeOf(CacheFileOperationBase)).apply(this, arguments));
+  }
+
+  _createClass(CacheFileOperationBase, [{
+    key: '_processFile',
+    value: function () {
+      var _ref38 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee26(filePath) {
+        var _this14 = this;
+
+        var zaicos;
+        return regeneratorRuntime.wrap(function _callee26$(_context26) {
+          while (1) {
+            switch (_context26.prev = _context26.next) {
+              case 0:
+                this.context.filePath = filePath; // 対象ファイル
+                this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
+                zaicos = _JsonUtil2.default.loadJson(filePath);
+
+                this.log('*** cacheファイル操作 ***');
+
+                if (!Array.isArray(zaicos)) {
+                  _context26.next = 13;
+                  break;
+                }
+
+                _context26.next = 7;
+                return this.beforeRows(zaicos);
+
+              case 7:
+                _context26.next = 9;
+                return (0, _pIteration.forEachSeries)(zaicos, function () {
+                  var _ref39 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee25(zaico, idx) {
+                    return regeneratorRuntime.wrap(function _callee25$(_context25) {
+                      while (1) {
+                        switch (_context25.prev = _context25.next) {
+                          case 0:
+                            _context25.next = 2;
+                            return _this14.beforeRow(zaico);
+
+                          case 2:
+                            _this14.log('* [' + (idx + 1) + '/' + zaicos.length + ']', zaico.title);
+                            _context25.next = 5;
+                            return _this14.eachRow(zaico);
+
+                          case 5:
+                            _context25.next = 7;
+                            return _this14.afterRow(zaico);
+
+                          case 7:
+                          case 'end':
+                            return _context25.stop();
+                        }
+                      }
+                    }, _callee25, _this14);
+                  }));
+
+                  return function (_x17, _x18) {
+                    return _ref39.apply(this, arguments);
+                  };
+                }());
+
+              case 9:
+                _context26.next = 11;
+                return this.afterRows(zaicos);
+
+              case 11:
+                _context26.next = 14;
+                break;
+
+              case 13:
+                this.log('*** ' + filePath + ' is not array.');
+
+              case 14:
+              case 'end':
+                return _context26.stop();
+            }
+          }
+        }, _callee26, this);
+      }));
+
+      function _processFile(_x16) {
+        return _ref38.apply(this, arguments);
+      }
+
+      return _processFile;
+    }()
+  }]);
+
+  return CacheFileOperationBase;
+}(ZaioOpeBase);
+
+var DiffUpdateOperation = function (_CacheFileOperationBa) {
+  _inherits(DiffUpdateOperation, _CacheFileOperationBa);
+
+  function DiffUpdateOperation() {
+    _classCallCheck(this, DiffUpdateOperation);
+
+    return _possibleConstructorReturn(this, (DiffUpdateOperation.__proto__ || Object.getPrototypeOf(DiffUpdateOperation)).apply(this, arguments));
+  }
+
+  _createClass(DiffUpdateOperation, [{
+    key: 'eachRow',
+    value: function () {
+      var _ref40 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee27(zaico) {
+        var found, ignore, diff, res;
+        return regeneratorRuntime.wrap(function _callee27$(_context27) {
+          while (1) {
+            switch (_context27.prev = _context27.next) {
+              case 0:
+                found = this.findZaicoByKey(zaico.id, 'id');
+
+                if (!found) {
+                  _context27.next = 14;
+                  break;
+                }
+
+                // 差分をとって除外キーになってなくて違いがあるデータを残す
+                ignore = new Set(_lodash2.default.get(this.config, 'ignoreKeys.diffUpdate', []));
+                diff = _lodash2.default.pickBy(zaico, function (v, k) {
+                  return k in found && !ignore.has(k) && !_lodash2.default.isEqual(v, found[k]);
+                });
+
+                if (_lodash2.default.isEmpty(diff)) {
+                  _context27.next = 12;
+                  break;
+                }
+
+                this.log('diff', JSON.stringify(diff));
+                _context27.next = 8;
+                return this.requester.update(found.id, diff);
+
+              case 8:
+                res = _context27.sent;
+
+                if (_lodash2.default.isEmpty(res)) {
+                  _context27.next = 12;
+                  break;
+                }
+
+                _context27.next = 12;
+                return this.updateDatum(found.id);
+
+              case 12:
+                _context27.next = 15;
+                break;
+
+              case 14:
+                this.log('ID[' + zaico.id + '\u306E\u30C7\u30FC\u30BF\u304C\u672A\u767B\u9332\u306E\u305F\u3081\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093', zaico.jan, zaico.title);
+
+              case 15:
+              case 'end':
+                return _context27.stop();
+            }
+          }
+        }, _callee27, this);
+      }));
+
+      function eachRow(_x19) {
+        return _ref40.apply(this, arguments);
+      }
+
+      return eachRow;
+    }()
+  }]);
+
+  return DiffUpdateOperation;
+}(CacheFileOperationBase);
 
 exports.default = {
   verify: function verify() {
@@ -1287,6 +1464,13 @@ exports.default = {
     }
 
     return new (Function.prototype.bind.apply(CacheUpdateOperation, [null].concat(args)))();
+  },
+  diffUpdate: function diffUpdate() {
+    for (var _len8 = arguments.length, args = Array(_len8), _key8 = 0; _key8 < _len8; _key8++) {
+      args[_key8] = arguments[_key8];
+    }
+
+    return new (Function.prototype.bind.apply(DiffUpdateOperation, [null].concat(args)))();
   }
 };
 //# sourceMappingURL=ZaicoOpe.js.map

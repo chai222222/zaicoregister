@@ -27,7 +27,7 @@ Usage: zaicoregister [options] [files...]
 		keep oldest in deleteDuplicate mode
 
 	--mode, -m
-		run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate
+		run mode. verify(default), add, update, delete, updateAdd, cache, deleteDuplicate, diffUpdate
 
 ```
 
@@ -42,9 +42,6 @@ Usage: zaicoregister [options] [files...]
 | updateAdd | jangetterデータを元にデータが登録済みであれば更新し、なければ更新する |
 | cache     | cacheファイルのみを更新する |
 | deleteDuplicate | 重複データを削除する |
-| dryrun    | ドライランモード。追加・削除・更新のリクエストはされないのでサーバーのデータは変わらない |
-| oldest    | 重複削除モードの場合、全てが削除対象の場合に一番古いデータを残す |
-| latest    | 重複削除モードの場合、全てが削除対象の場合に一番新しいデータを残す |
 
 - add, update, delete, updateAdd では処理前に全データを全て取得する
   -　```-c``` オプションをつけた場合、キャッシュファイルがあればデータはそこから取得し、処理後に更新する
@@ -55,17 +52,19 @@ Usage: zaicoregister [options] [files...]
   - ```-f``` オプションをつけると、作成日時と更新日時が全て同じでも削除する（つまり対象のJANはなくなる）
   - ```--oldest``` オプションをつけると、作成日時と更新日時が全て同じでも一番古いもの以外は削除する
   - ```--latest``` オプションをつけると、作成日時と更新日時が全て同じでも一番新しいもの以外は削除する
+- dryrun は ZAICO への更新・追加・削除リクエスト送らないで確認だけするオプション
+
 
 
 #### 例
 
-キャッシュを更新
+##### キャッシュを更新
 
 ```
 zaicoregister -m cache
 ```
 
-zaico追加・削除・更新
+##### zaico追加・削除・更新
 
 ```
 zaicoregister -c -m add jangetterの出力data.json       # JANが重複してるものは追加しない
@@ -77,17 +76,23 @@ zaicoregister -c -m delete jangetterの出力data.json    # JANが見つから�
 
 ※ -c をつけない場合には全データをzaicoから都度とってくるので頻繁にやる場合にはキャッシュを使うこと
 
-dryrun
+##### dryrun
 
 ```
 zaicoregister -c -m delete jangetterの出力data.json    # 実際にサーバーからは削除されない
 ```
 
-重複削除
+##### 重複削除
 
 ```
 zaicoregister -c -m deleteDuplicate         # 重複削除。更新日時と作成日時が別のものがないものは削除しない
 zaicoregister -f -c -m deleteDuplicate      # 重複削除。更新日時と作成日時が別のものがない場合も全て削除する
 zaicoregister -oldest -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがない場合、最古のデータ以外は削除
 zaicoregister -latest -c -m deleteDuplicate # 重複削除。更新日時と作成日時が別のものがない場合、最新のデータ以外は削除
+```
+
+##### 差分更新
+
+```
+zaicoregister -c -m diffUpdate cacheファイルをコピーして編集したファイル # 差分で既存のデータを更新。IDがないもの、差分がないものは更新しない
 ```

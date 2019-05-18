@@ -117,8 +117,12 @@ class ZaioOpeBase {
     return this.context.data.filter(z => z[this.mappingKey('jan')] === jan);
   }
 
+  findZaicoByKey(value, key) {
+    return this.context.data.find(z => z[key] === value);
+  }
+
   findZaico(jan) {
-    return this.context.data.find(z => z[this.mappingKey('jan')] === jan);
+    return this.findZaicoByKey(jan, this.mappingKey('jan'));
   }
 
   cloneData() {
@@ -202,9 +206,9 @@ class ZaioOpeBase {
     const rows = jangetterResult.rows;
     if (Array.isArray(rows)) {
       await this.beforeRows(rows);
-      await forEachSeries(rows, async row => {
+      await forEachSeries(rows, async (row, idx) => {
         await this.beforeRow(row);
-        this.log('*', row.title);
+        this.log(`* [${idx+1}/${rows.length}]`, row.title);
         await this.eachRow(row);
         await this.afterRow(row);
       });
@@ -345,6 +349,46 @@ class DeleteDuplicateOperation extends ZaioOpeBase {
   }
 }
 
+class CacheFileOperationBase extends ZaioOpeBase {
+
+  async _processFile(filePath) {
+    this.context.filePath = filePath; // 対象ファイル
+    this.context.fileDir = path.dirname(filePath); // 対象dir
+    const zaicos = JsonUtil.loadJson(filePath);
+    this.log('*** cacheファイル操作 ***');
+    if (Array.isArray(zaicos)) {
+      await this.beforeRows(zaicos);
+      await forEachSeries(zaicos, async (zaico, idx) => {
+        await this.beforeRow(zaico);
+        this.log(`* [${idx+1}/${zaicos.length}]`, zaico.title);
+        await this.eachRow(zaico);
+        await this.afterRow(zaico);
+      });
+      await this.afterRows(zaicos);
+    } else {
+      this.log(`*** ${filePath} is not array.`);
+    }
+  }
+}
+
+class DiffUpdateOperation extends CacheFileOperationBase {
+  async eachRow(zaico) {
+    const found = this.findZaicoByKey(zaico.id, 'id');
+    if (found) {
+      // 差分をとって除外キーになってなくて違いがあるデータを残す
+      const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
+      const diff = _.pickBy(zaico, (v, k) => k in found && !ignore.has(k) && !_.isEqual(v, found[k]));
+      if (!_.isEmpty(diff)) {
+        this.log('diff', JSON.stringify(diff));
+        const res = await this.requester.update(found.id, diff);
+        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      }
+    } else {
+      this.log(`ID[${zaico.id}のデータが未登録のため更新できません`, zaico.jan, zaico.title);
+    }
+  }
+}
+
 export default {
   verify: (...args) => new VerifyOperation(...args),
   add: (...args) => new AddOperation(...args),
@@ -353,4 +397,5 @@ export default {
   delete: (...args) => new DeleteOperation(...args),
   deleteDuplicate: (...args) => new DeleteDuplicateOperation(...args),
   cache: (...args) => new CacheUpdateOperation(...args),
+  diffUpdate: (...args) => new DiffUpdateOperation(...args),
 }
