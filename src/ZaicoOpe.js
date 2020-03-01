@@ -375,13 +375,18 @@ class DiffUpdateOperation extends CacheFileOperationBase {
   async eachRow(zaico) {
     const found = this.findZaicoByKey(zaico.id, 'id');
     if (found) {
-      // 差分をとって除外キーになってなくて違いがあるデータを残す
-      const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
-      const diff = _.pickBy(zaico, (v, k) => k in found && !ignore.has(k) && !_.isEqual(v, found[k]));
-      if (!_.isEmpty(diff)) {
-        this.log('diff', JSON.stringify(diff));
-        const res = await this.requester.update(found.id, diff);
-        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+      if (Object.keys(zaico).length === 1) { // 削除
+        const res = await this.requester.remove(found.id, found.code);
+        if (!_.isEmpty(res)) await this.updateDatum(found.id, true);
+      } else { // 更新
+        // 差分をとって除外キーになってなくて違いがあるデータを残す
+        const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
+        const diff = _.pickBy(zaico, (v, k) => k in found && !ignore.has(k) && !_.isEqual(v, found[k]));
+        if (!_.isEmpty(diff)) {
+          this.log('diff', JSON.stringify(diff));
+          const res = await this.requester.update(found.id, diff);
+          if (!_.isEmpty(res)) await this.updateDatum(found.id);
+        }
       }
     } else {
       this.log(`ID[${zaico.id}のデータが未登録のため更新できません`, zaico.jan, zaico.title);

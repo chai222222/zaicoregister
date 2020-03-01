@@ -1351,7 +1351,8 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
     key: 'eachRow',
     value: function () {
       var _ref40 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee27(zaico) {
-        var found, ignore, diff, res;
+        var found, res, ignore, diff, _res2;
+
         return regeneratorRuntime.wrap(function _callee27$(_context27) {
           while (1) {
             switch (_context27.prev = _context27.next) {
@@ -1359,10 +1360,35 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
                 found = this.findZaicoByKey(zaico.id, 'id');
 
                 if (!found) {
-                  _context27.next = 14;
+                  _context27.next = 23;
                   break;
                 }
 
+                if (!(Object.keys(zaico).length === 1)) {
+                  _context27.next = 11;
+                  break;
+                }
+
+                _context27.next = 5;
+                return this.requester.remove(found.id, found.code);
+
+              case 5:
+                res = _context27.sent;
+
+                if (_lodash2.default.isEmpty(res)) {
+                  _context27.next = 9;
+                  break;
+                }
+
+                _context27.next = 9;
+                return this.updateDatum(found.id, true);
+
+              case 9:
+                _context27.next = 21;
+                break;
+
+              case 11:
+                // 更新
                 // 差分をとって除外キーになってなくて違いがあるデータを残す
                 ignore = new Set(_lodash2.default.get(this.config, 'ignoreKeys.diffUpdate', []));
                 diff = _lodash2.default.pickBy(zaico, function (v, k) {
@@ -1370,33 +1396,33 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
                 });
 
                 if (_lodash2.default.isEmpty(diff)) {
-                  _context27.next = 12;
+                  _context27.next = 21;
                   break;
                 }
 
                 this.log('diff', JSON.stringify(diff));
-                _context27.next = 8;
+                _context27.next = 17;
                 return this.requester.update(found.id, diff);
 
-              case 8:
-                res = _context27.sent;
+              case 17:
+                _res2 = _context27.sent;
 
-                if (_lodash2.default.isEmpty(res)) {
-                  _context27.next = 12;
+                if (_lodash2.default.isEmpty(_res2)) {
+                  _context27.next = 21;
                   break;
                 }
 
-                _context27.next = 12;
+                _context27.next = 21;
                 return this.updateDatum(found.id);
 
-              case 12:
-                _context27.next = 15;
+              case 21:
+                _context27.next = 24;
                 break;
 
-              case 14:
+              case 23:
                 this.log('ID[' + zaico.id + '\u306E\u30C7\u30FC\u30BF\u304C\u672A\u767B\u9332\u306E\u305F\u3081\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093', zaico.jan, zaico.title);
 
-              case 15:
+              case 24:
               case 'end':
                 return _context27.stop();
             }
