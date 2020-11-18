@@ -1,16 +1,18 @@
 import axios from 'axios';
 import _ from 'lodash';
+import { sleep } from './util/timers';
 
 export default class ZaicoRequester {
 
   constructor(config, options) {
-    this.config = config;
-    this.options = options;
+    this._config = config;
+    this._options = options;
+    this._requestCount = 0;
   }
 
   _createRequestHeaders() {
     return {
-      Authorization: `Bearer ${this.config.token}`,
+      Authorization: `Bearer ${this._config.token}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
@@ -22,8 +24,21 @@ export default class ZaicoRequester {
     };
   }
 
+  _getWaitPromise() {
+    const waitPerCount = _.get(this._config, 'waitPerCount', 10);
+    this._requestCount++;
+    if (this._requestCount % waitPerCount < 1) {
+      const waitMills = _.get(this._config, 'waitMills', 2000);
+      if (waitMills > 0) {
+        console.log(`[WAIT][${waitMills}ミリ秒][${this._requestCount}リクエスト]`);
+        return sleep(waitMills);
+      }
+    }
+    return Promise.resolve();
+  }
+
   log(...args) {
-    if (this.options.dryrun) args.unshift('[DRYRUN]');
+    if (this._options.dryrun) args.unshift('[DRYRUN]');
     console.log(...args.map(v => v === undefined ? '""' : v));
   }
 
@@ -50,19 +65,21 @@ export default class ZaicoRequester {
   }
 
   apiUrl(id = '') {
-    return id ? `${this.config.apiUrl}/${id}` : this.config.apiUrl;
+    return id ? `${this._config.apiUrl}/${id}` : this._config.apiUrl;
   }
 
   async _zaicoOperation(apiFunc, logFunc) {
-    const res = (this.options.dryrun) ? {} : await apiFunc();
+    await this._getWaitPromise();
+    const res = (this._options.dryrun) ? {} : await apiFunc();
     logFunc(res);
     return res;
   }
 
   async list() {
-    let nextUrl = `${this.config.apiUrl}?page=1`; // 先頭ページからアクセス
+    let nextUrl = `${this._config.apiUrl}?page=1`; // 先頭ページからアクセス
     const allData = [];
     while (nextUrl) {
+      await this._getWaitPromise();
       this.log('** get list', nextUrl);
       const res = await axios.get(nextUrl, this._createRequestConfig()).catch((e) => this.err(e));
       nextUrl = undefined;

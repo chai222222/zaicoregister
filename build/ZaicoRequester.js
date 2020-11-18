@@ -14,6 +14,8 @@ var _lodash = require('lodash');
 
 var _lodash2 = _interopRequireDefault(_lodash);
 
+var _timers = require('./util/timers');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
@@ -26,15 +28,16 @@ var ZaicoRequester = function () {
   function ZaicoRequester(config, options) {
     _classCallCheck(this, ZaicoRequester);
 
-    this.config = config;
-    this.options = options;
+    this._config = config;
+    this._options = options;
+    this._requestCount = 0;
   }
 
   _createClass(ZaicoRequester, [{
     key: '_createRequestHeaders',
     value: function _createRequestHeaders() {
       return {
-        Authorization: 'Bearer ' + this.config.token,
+        Authorization: 'Bearer ' + this._config.token,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       };
@@ -47,6 +50,20 @@ var ZaicoRequester = function () {
       };
     }
   }, {
+    key: '_getWaitPromise',
+    value: function _getWaitPromise() {
+      var waitPerCount = _lodash2.default.get(this._config, 'waitPerCount', 10);
+      this._requestCount++;
+      if (this._requestCount % waitPerCount < 1) {
+        var waitMills = _lodash2.default.get(this._config, 'waitMills', 2000);
+        if (waitMills > 0) {
+          console.log('[WAIT][' + waitMills + '\u30DF\u30EA\u79D2][' + this._requestCount + '\u30EA\u30AF\u30A8\u30B9\u30C8]');
+          return (0, _timers.sleep)(waitMills);
+        }
+      }
+      return Promise.resolve();
+    }
+  }, {
     key: 'log',
     value: function log() {
       var _console;
@@ -55,7 +72,7 @@ var ZaicoRequester = function () {
         args[_key] = arguments[_key];
       }
 
-      if (this.options.dryrun) args.unshift('[DRYRUN]');
+      if (this._options.dryrun) args.unshift('[DRYRUN]');
       (_console = console).log.apply(_console, _toConsumableArray(args.map(function (v) {
         return v === undefined ? '""' : v;
       })));
@@ -88,7 +105,7 @@ var ZaicoRequester = function () {
     value: function apiUrl() {
       var id = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
 
-      return id ? this.config.apiUrl + '/' + id : this.config.apiUrl;
+      return id ? this._config.apiUrl + '/' + id : this._config.apiUrl;
     }
   }, {
     key: '_zaicoOperation',
@@ -99,29 +116,33 @@ var ZaicoRequester = function () {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                if (!this.options.dryrun) {
-                  _context.next = 4;
+                _context.next = 2;
+                return this._getWaitPromise();
+
+              case 2:
+                if (!this._options.dryrun) {
+                  _context.next = 6;
                   break;
                 }
 
                 _context.t0 = {};
-                _context.next = 7;
+                _context.next = 9;
                 break;
 
-              case 4:
-                _context.next = 6;
+              case 6:
+                _context.next = 8;
                 return apiFunc();
 
-              case 6:
+              case 8:
                 _context.t0 = _context.sent;
 
-              case 7:
+              case 9:
                 res = _context.t0;
 
                 logFunc(res);
                 return _context.abrupt('return', res);
 
-              case 10:
+              case 12:
               case 'end':
                 return _context.stop();
             }
@@ -146,23 +167,27 @@ var ZaicoRequester = function () {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
-                nextUrl = this.config.apiUrl + '?page=1'; // 先頭ページからアクセス
+                nextUrl = this._config.apiUrl + '?page=1'; // 先頭ページからアクセス
 
                 allData = [];
 
               case 2:
                 if (!nextUrl) {
-                  _context2.next = 11;
+                  _context2.next = 13;
                   break;
                 }
 
+                _context2.next = 5;
+                return this._getWaitPromise();
+
+              case 5:
                 this.log('** get list', nextUrl);
-                _context2.next = 6;
+                _context2.next = 8;
                 return _axios2.default.get(nextUrl, this._createRequestConfig()).catch(function (e) {
                   return _this.err(e);
                 });
 
-              case 6:
+              case 8:
                 res = _context2.sent;
 
                 nextUrl = undefined;
@@ -178,10 +203,10 @@ var ZaicoRequester = function () {
                 _context2.next = 2;
                 break;
 
-              case 11:
+              case 13:
                 return _context2.abrupt('return', allData);
 
-              case 12:
+              case 14:
               case 'end':
                 return _context2.stop();
             }
