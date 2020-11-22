@@ -12,7 +12,8 @@ Usage: zaicoregister [options] [files...]
 		'zicoregister -h' or 'zicoregister --help'
 
 	--cache, -c
-		enable cache
+		キャッシュモード有効にする。
+		基本的にはキャッシュはファイルに作成されるが、このモードをつけない場合、最後に削除される。
 
 	--dryrun
 		dry run mode
@@ -74,7 +75,8 @@ zaicoregister -c -m updateAdd jangetterの出力data.json # JANがあれば更�
 zaicoregister -c -m delete jangetterの出力data.json    # JANが見つからないものはエラー、あれば削除
 ```
 
-※ -c をつけない場合には全データをzaicoから都度とってくるので頻繁にやる場合にはキャッシュを使うこと
+※ -c をつけない場合には全データをzaicoから都度とってくるので頻繁にやる場合にはキャッシュを使うこと。
+   -c をつけていてもキャッシュが無い場合は先に取得する。またつけない場合、終了時にキャッシュファイルは削除される。
 
 ##### dryrun
 
@@ -101,11 +103,52 @@ zaicoregister -c -m diffUpdate cacheファイルをコピーして編集した�
 
 ## .zaicoregisterrc
 
-実行ディレクトリに `.zaicoregisterrc` を用意することにより、csv 制御ができるようになる。
+実行ディレクトリに `.zaicoregisterrc` を用意し、環境設定する
 
 ```
 {
-  csv: {
-    columns: [ ]
+  "token": "文字列",      // zaicoトークン
+  "cacheFile": "文字列",  // キャッシュファイル名(省略時は ./zr_cache.json)
+  "editedFile": "文字列", // キャッシュファイル名(省略時は ./zr_edited.json)
+  "apiUrl": "文字列",     // zaico api(省略時は https://web.zaico.co.jp/api/v1/inventories)
+  "waitMills": 数値,      // リクエストウエイトミリ秒(省略時は2000)
+  "waitPerCount": 数値,   // ウェイトを入れ込むリクエスト数(省略時は10)
+  "requestMaxPage": 数値, // 一覧取得時の最大数。０以下の場合には全て取得(省略時は0)
+  "mapping": {            // jancetterとの項目マッピング定義(省略時は下記の値)
+    "jan": "code",
+    "picture": "item_image"
+  },
+  "convert": {            // コンバーター定義
+    "picture": "fileToBase64"
+  },
+  "ignoreKeys": {
+    "diffUpdate": [
+      "item_image", "create_at", "update_at", "create_user_name", "update_user_name"
+    ]
+  },
+  "replaceValue": {
+    "update": {
+      "optional_attributes": [
+        { "regexp": [ "(\"name\": *\"キーワード\", *\"value\": *\")([^\"]+)", "" ], "replace": "$1${category}" }
+      ]
+    }
+  },
+  "assignValue": {
+    "add": {
+      "optional_attributes": [
+        { "name": "キーワード", "value": "${category}" }
+      ]
+    },
+    "update": {
+      "optional_attributes": [
+        { "name": "キーワード", "value": "${category}" }
+      ]
+    }
+  },
+  "initialValue": {
+    "add": {
+    },
+    "update": {
+    }
   }
 }

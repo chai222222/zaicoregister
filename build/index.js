@@ -50,6 +50,22 @@ var fixedArgs = [{
   description: 'run mode. ' + modeHelp
 }];
 
+var rcDefault = {
+  cacheFile: './zr_cache.json',
+  editedFile: './zr_edited.json',
+  apiUrl: 'https://web.zaico.co.jp/api/v1/inventories',
+  waitMills: 2000,
+  waitPerCount: 10,
+  requestMaxPage: 0,
+  mapping: {
+    jan: 'code',
+    picture: 'item_image'
+  },
+  convert: {
+    picture: 'fileToBase64'
+  }
+};
+
 _argv2.default.option([].concat(fixedArgs));
 var args = _argv2.default.run();
 var mode = args.options.mode || Object.keys(_ZaicoOpe2.default).shift();
@@ -61,7 +77,7 @@ if (!opeCreator) {
   process.exit(1);
 } else {
   try {
-    var rc = _JsonUtil2.default.loadJson('./.zaicoregisterrc');
+    var rc = Object.assign(rcDefault, _JsonUtil2.default.loadJson('./.zaicoregisterrc'));
     opeCreator(rc, args.options).processFiles(args.targets).then(function (res) {
       if (!res) {
         _argv2.default.help();

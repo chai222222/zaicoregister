@@ -104,9 +104,15 @@ class ZaioOpeBase {
     this.cloneData();
   }
 
-  async getZaicoData() {
-    this.log('** get list', this.config.cacheFile);
-    return await this.requester.list();
+  removeCacheData() {
+    this.log('** remove cahce', this.config.cacheFile);
+    fs.unlinkSync(this.config.cacheFile);
+  }
+
+  async zaicoDataToCache() {
+    this.log('** get all zaico data', this.config.cacheFile);
+    const out = fs.createWriteStream(this.config.cacheFile);
+    return await this.requester.listToArrayWriter(JsonUtil.createObjectArrayWriter(out));
   }
 
   useCache() {
@@ -138,25 +144,19 @@ class ZaioOpeBase {
   }
 
   async beforeFiles() {
-    if (this.useCache()) {
-      if (fs.existsSync(this.config.cacheFile)) {
-        this.loadCacheData();
-        return;
-      }
+    if (!fs.existsSync(this.config.cacheFile)) {
+      await this.zaicoDataToCache();
     }
-    this.context.data = [];
-    const list = await this.getZaicoData();
-    if (list) {
-      this.context.data = list;
-      if (this.useCache()) {
-        this.saveCacheData();
-      }
-    }
+    this.loadCacheData();
   }
 
   async afterFiles() {
-    if (this.useCache() && this.isChangedData() && !this.options.dryrun) {
-      this.saveCacheData();
+    if (this.useCache()) {
+      if (this.isChangedData() && !this.options.dryrun) {
+        this.saveCacheData();
+      }
+    } else {
+      this.removeCacheData();
     }
   }
 
@@ -287,8 +287,7 @@ class DeleteOperation extends ZaioOpeBase {
 
 class CacheUpdateOperation extends ZaioOpeBase {
   async beforeFiles() {
-    const list = await this.getZaicoData();
-    if (list) this.context.data = list;
+    await this.zaicoDataToCache();
   }
 
   async _processFiles() {}
@@ -298,7 +297,7 @@ class CacheUpdateOperation extends ZaioOpeBase {
   }
 
   isChangedData() {
-    return true;
+    return false;
   }
 
   canProcess() {

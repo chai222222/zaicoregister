@@ -165,21 +165,29 @@ var ZaioOpeBase = function () {
       this.cloneData();
     }
   }, {
-    key: 'getZaicoData',
+    key: 'removeCacheData',
+    value: function removeCacheData() {
+      this.log('** remove cahce', this.config.cacheFile);
+      _fs2.default.unlinkSync(this.config.cacheFile);
+    }
+  }, {
+    key: 'zaicoDataToCache',
     value: function () {
       var _ref7 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+        var out;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                this.log('** get list', this.config.cacheFile);
-                _context.next = 3;
-                return this.requester.list();
-
-              case 3:
-                return _context.abrupt('return', _context.sent);
+                this.log('** get all zaico data', this.config.cacheFile);
+                out = _fs2.default.createWriteStream(this.config.cacheFile);
+                _context.next = 4;
+                return this.requester.listToArrayWriter(_JsonUtil2.default.createObjectArrayWriter(out));
 
               case 4:
+                return _context.abrupt('return', _context.sent);
+
+              case 5:
               case 'end':
                 return _context.stop();
             }
@@ -187,11 +195,11 @@ var ZaioOpeBase = function () {
         }, _callee, this);
       }));
 
-      function getZaicoData() {
+      function zaicoDataToCache() {
         return _ref7.apply(this, arguments);
       }
 
-      return getZaicoData;
+      return zaicoDataToCache;
     }()
   }, {
     key: 'useCache',
@@ -238,40 +246,22 @@ var ZaioOpeBase = function () {
     key: 'beforeFiles',
     value: function () {
       var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
-        var list;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
-                if (!this.useCache()) {
-                  _context2.next = 4;
+                if (_fs2.default.existsSync(this.config.cacheFile)) {
+                  _context2.next = 3;
                   break;
                 }
 
-                if (!_fs2.default.existsSync(this.config.cacheFile)) {
-                  _context2.next = 4;
-                  break;
-                }
+                _context2.next = 3;
+                return this.zaicoDataToCache();
 
+              case 3:
                 this.loadCacheData();
-                return _context2.abrupt('return');
 
               case 4:
-                this.context.data = [];
-                _context2.next = 7;
-                return this.getZaicoData();
-
-              case 7:
-                list = _context2.sent;
-
-                if (list) {
-                  this.context.data = list;
-                  if (this.useCache()) {
-                    this.saveCacheData();
-                  }
-                }
-
-              case 9:
               case 'end':
                 return _context2.stop();
             }
@@ -293,8 +283,12 @@ var ZaioOpeBase = function () {
           while (1) {
             switch (_context3.prev = _context3.next) {
               case 0:
-                if (this.useCache() && this.isChangedData() && !this.options.dryrun) {
-                  this.saveCacheData();
+                if (this.useCache()) {
+                  if (this.isChangedData() && !this.options.dryrun) {
+                    this.saveCacheData();
+                  }
+                } else {
+                  this.removeCacheData();
                 }
 
               case 1:
@@ -1025,20 +1019,14 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
     key: 'beforeFiles',
     value: function () {
       var _ref30 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20() {
-        var list;
         return regeneratorRuntime.wrap(function _callee20$(_context20) {
           while (1) {
             switch (_context20.prev = _context20.next) {
               case 0:
                 _context20.next = 2;
-                return this.getZaicoData();
+                return this.zaicoDataToCache();
 
               case 2:
-                list = _context20.sent;
-
-                if (list) this.context.data = list;
-
-              case 4:
               case 'end':
                 return _context20.stop();
             }
@@ -1081,7 +1069,7 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   }, {
     key: 'isChangedData',
     value: function isChangedData() {
-      return true;
+      return false;
     }
   }, {
     key: 'canProcess',

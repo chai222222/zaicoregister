@@ -52,10 +52,10 @@ var ZaicoRequester = function () {
   }, {
     key: '_getWaitPromise',
     value: function _getWaitPromise() {
-      var waitPerCount = _lodash2.default.get(this._config, 'waitPerCount', 10);
+      var waitPerCount = _lodash2.default.get(this._config, 'waitPerCount');
       this._requestCount++;
       if (this._requestCount % waitPerCount < 1) {
-        var waitMills = _lodash2.default.get(this._config, 'waitMills', 2000);
+        var waitMills = _lodash2.default.get(this._config, 'waitMills');
         if (waitMills > 0) {
           console.log('[WAIT][' + waitMills + '\u30DF\u30EA\u79D2][' + this._requestCount + '\u30EA\u30AF\u30A8\u30B9\u30C8]');
           return (0, _timers.sleep)(waitMills);
@@ -157,42 +157,47 @@ var ZaicoRequester = function () {
       return _zaicoOperation;
     }()
   }, {
-    key: 'list',
+    key: 'listToArrayWriter',
     value: function () {
-      var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
+      var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(arrWriter) {
         var _this = this;
 
-        var nextUrl, allData, res, link, m;
+        var nextUrl, count, cchk, res, link, m;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
                 nextUrl = this._config.apiUrl + '?page=1'; // 先頭ページからアクセス
 
-                allData = [];
+                count = 0;
+                cchk = this._config.requestMaxPage <= 0 ? function () {
+                  return true;
+                } : function () {
+                  return count++ < _this._config.requestMaxPage;
+                };
 
-              case 2:
-                if (!nextUrl) {
-                  _context2.next = 13;
+              case 3:
+                if (!(nextUrl && cchk())) {
+                  _context2.next = 14;
                   break;
                 }
 
-                _context2.next = 5;
+                _context2.next = 6;
                 return this._getWaitPromise();
 
-              case 5:
-                this.log('** get list', nextUrl);
-                _context2.next = 8;
+              case 6:
+                this.log('** get listToArrayWriter', nextUrl);
+                _context2.next = 9;
                 return _axios2.default.get(nextUrl, this._createRequestConfig()).catch(function (e) {
                   return _this.err(e);
                 });
 
-              case 8:
+              case 9:
                 res = _context2.sent;
 
                 nextUrl = undefined;
                 if (res && Array.isArray(res.data)) {
-                  allData.push.apply(allData, _toConsumableArray(res.data));
+                  arrWriter.write(res.data);
                   link = res.headers.link;
                   m = void 0;
 
@@ -200,13 +205,14 @@ var ZaicoRequester = function () {
                     nextUrl = m[1];
                   }
                 }
-                _context2.next = 2;
+                _context2.next = 3;
                 break;
 
-              case 13:
-                return _context2.abrupt('return', allData);
-
               case 14:
+                _context2.next = 16;
+                return arrWriter.end();
+
+              case 16:
               case 'end':
                 return _context2.stop();
             }
@@ -214,11 +220,11 @@ var ZaicoRequester = function () {
         }, _callee2, this);
       }));
 
-      function list() {
+      function listToArrayWriter(_x4) {
         return _ref2.apply(this, arguments);
       }
 
-      return list;
+      return listToArrayWriter;
     }()
   }, {
     key: 'info',
@@ -263,7 +269,7 @@ var ZaicoRequester = function () {
         }, _callee4, this);
       }));
 
-      function info(_x4) {
+      function info(_x5) {
         return _ref3.apply(this, arguments);
       }
 
@@ -314,7 +320,7 @@ var ZaicoRequester = function () {
         }, _callee6, this);
       }));
 
-      function add(_x5) {
+      function add(_x6) {
         return _ref5.apply(this, arguments);
       }
 
@@ -365,7 +371,7 @@ var ZaicoRequester = function () {
         }, _callee8, this);
       }));
 
-      function update(_x6, _x7) {
+      function update(_x7, _x8) {
         return _ref7.apply(this, arguments);
       }
 
@@ -416,7 +422,7 @@ var ZaicoRequester = function () {
         }, _callee10, this);
       }));
 
-      function remove(_x8, _x9) {
+      function remove(_x9, _x10) {
         return _ref9.apply(this, arguments);
       }
 

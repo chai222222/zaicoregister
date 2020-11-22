@@ -25,10 +25,10 @@ export default class ZaicoRequester {
   }
 
   _getWaitPromise() {
-    const waitPerCount = _.get(this._config, 'waitPerCount', 10);
+    const waitPerCount = _.get(this._config, 'waitPerCount');
     this._requestCount++;
     if (this._requestCount % waitPerCount < 1) {
-      const waitMills = _.get(this._config, 'waitMills', 2000);
+      const waitMills = _.get(this._config, 'waitMills');
       if (waitMills > 0) {
         console.log(`[WAIT][${waitMills}ミリ秒][${this._requestCount}リクエスト]`);
         return sleep(waitMills);
@@ -75,16 +75,19 @@ export default class ZaicoRequester {
     return res;
   }
 
-  async list() {
+  async listToArrayWriter(arrWriter) {
     let nextUrl = `${this._config.apiUrl}?page=1`; // 先頭ページからアクセス
-    const allData = [];
-    while (nextUrl) {
+    let count = 0;
+    const cchk = this._config.requestMaxPage <= 0
+      ? () => true
+      : () => count++ < this._config.requestMaxPage;
+    while (nextUrl && cchk()) {
       await this._getWaitPromise();
-      this.log('** get list', nextUrl);
+      this.log('** get listToArrayWriter', nextUrl);
       const res = await axios.get(nextUrl, this._createRequestConfig()).catch((e) => this.err(e));
       nextUrl = undefined;
       if (res && Array.isArray(res.data)) {
-        allData.push(...res.data);
+        arrWriter.write(res.data);
         const link = res.headers.link;
         let m;
         if (link && (m = /<([^>]+)>; *rel="next"/.exec(link)) && m[1].indexOf('?page') > 0) {
@@ -92,7 +95,7 @@ export default class ZaicoRequester {
         }
       }
     }
-    return allData;
+    await arrWriter.end();
   }
 
   async info(id) {
