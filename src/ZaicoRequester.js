@@ -68,9 +68,9 @@ export default class ZaicoRequester {
     return id ? `${this._config.apiUrl}/${id}` : this._config.apiUrl;
   }
 
-  async _zaicoOperation(apiFunc, logFunc) {
+  async _zaicoOperation(getDummy, apiFunc, logFunc) {
     await this._getWaitPromise();
-    const res = (this._options.dryrun) ? {} : await apiFunc();
+    const res = (this._options.dryrun) ? getDummy() : await apiFunc();
     logFunc(res);
     return res;
   }
@@ -98,15 +98,28 @@ export default class ZaicoRequester {
     await arrWriter.end();
   }
 
+  _dummy(id) {
+    const res = { data: { } };
+    if (typeof id === 'string') res.data.data_id = id;
+    if (typeof id === 'object') Object.assign(res.data, id);
+    if (!res.data.data_id && res.data.id) res.data.data_id = res.data.id;
+    if (!res.data.data_id && !res.data.id) {
+      const did = Math.random().toString(36).substring(7);
+      res.data.id = did;
+      res.data.data_id = did;
+    }
+    return res;
+  }
+
   async info(id) {
-    return await this._zaicoOperation(async () => {
+    return await this._zaicoOperation(() => ({}), async () => {
       return await axios.get(this.apiUrl(id), this._createRequestConfig()).catch((e) => this.err(e));
     }, (res) => {
     });
   }
 
   async add(data) {
-    return await this._zaicoOperation(async () => {
+    return await this._zaicoOperation(() => this._dummy(data), async () => {
       return await axios.post(this.apiUrl(), data, this._createRequestConfig()).catch((e) => this.err(e));
     }, (res) => {
       this.log('追加', data.code, _.get(res, 'data.data_id', ''));
@@ -114,7 +127,7 @@ export default class ZaicoRequester {
   }
 
   async update(id, data) {
-    return await this._zaicoOperation(async () => {
+    return await this._zaicoOperation(() => this._dummy(data), async () => {
       return await axios.put(this.apiUrl(id), data, this._createRequestConfig()).catch((e) => this.err(e));
     }, (res) => {
       this.log('更新', data.code, id);
@@ -122,7 +135,7 @@ export default class ZaicoRequester {
   }
 
   async remove(id, jan) {
-    return await this._zaicoOperation(async () => {
+    return await this._zaicoOperation(() => this._dummy(id), async () => {
       return await axios.delete(this.apiUrl(id), this._createRequestConfig()).catch((e) => this.err(e));
     }, (res) => {
       this.log('削除', jan, id);

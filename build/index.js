@@ -52,7 +52,8 @@ var fixedArgs = [{
 
 var rcDefault = {
   cacheFile: './zr_cache.json',
-  editedFile: './zr_edited.json',
+  cacheOldFile: './zr_cache_old.json',
+  editTmpFile: './zr_edit.json',
   apiUrl: 'https://web.zaico.co.jp/api/v1/inventories',
   waitMills: 2000,
   waitPerCount: 10,
@@ -78,6 +79,7 @@ if (!opeCreator) {
 } else {
   try {
     var rc = Object.assign(rcDefault, _JsonUtil2.default.loadJson('./.zaicoregisterrc'));
+    if (args.options.dryrun) console.log('** [DRYRUN] **');
     opeCreator(rc, args.options).processFiles(args.targets).then(function (res) {
       if (!res) {
         _argv2.default.help();

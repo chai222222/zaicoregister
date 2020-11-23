@@ -23,12 +23,13 @@
         }, {
             "type": "node",
             "request": "launch",
-            "name": "add",
+            "name": "updateAdd",
             "program": "${workspaceFolder}/build/index.js",
             "args": [
+              "--dryrun",
               "-c",
               "-m",
-              "add",
+              "updateAdd",
               "../jangetter/Morinaga_チョコボール/data.json"
             ]
 

@@ -10,6 +10,8 @@ var _fs = require('fs');
 
 var _fs2 = _interopRequireDefault(_fs);
 
+var _stream = require('stream');
+
 var _JSONStream = require('JSONStream');
 
 var _JSONStream2 = _interopRequireDefault(_JSONStream);
@@ -105,18 +107,29 @@ var JsonUtil = function () {
       this._existPath(path);
       var is = _fs2.default.createReadStream(path, 'utf-8');
 
-      for (var _len = arguments.length, writables = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-        writables[_key - 1] = arguments[_key];
+      for (var _len = arguments.length, dest = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+        dest[_key - 1] = arguments[_key];
       }
 
-      return [_JSONStream2.default.parse('*')].concat(writables).reduce(function (is, w) {
+      return [_JSONStream2.default.parse('*')].concat(dest).reduce(function (is, w) {
         return is.pipe(w);
       }, is);
     }
   }, {
     key: 'createObjectArrayWriter',
-    value: function createObjectArrayWriter(stream) {
-      return new ArrayWriter(stream);
+    value: function createObjectArrayWriter(path) {
+      return new ArrayWriter(_fs2.default.createWriteStream(path));
+    }
+  }, {
+    key: 'createObjectArrayReadble',
+    value: function createObjectArrayReadble(arr) {
+      var readable = new _stream.Readable({ objectMode: true, read: function read() {}
+      });
+      arr.forEach(function (e) {
+        return readable.push(e);
+      });
+      readable.push(null);
+      return readable;
     }
   }]);
 

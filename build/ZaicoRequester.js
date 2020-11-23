@@ -4,6 +4,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 var _axios = require('axios');
@@ -110,7 +112,7 @@ var ZaicoRequester = function () {
   }, {
     key: '_zaicoOperation',
     value: function () {
-      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(apiFunc, logFunc) {
+      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(getDummy, apiFunc, logFunc) {
         var res;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
@@ -125,7 +127,7 @@ var ZaicoRequester = function () {
                   break;
                 }
 
-                _context.t0 = {};
+                _context.t0 = getDummy();
                 _context.next = 9;
                 break;
 
@@ -150,7 +152,7 @@ var ZaicoRequester = function () {
         }, _callee, this);
       }));
 
-      function _zaicoOperation(_x2, _x3) {
+      function _zaicoOperation(_x2, _x3, _x4) {
         return _ref.apply(this, arguments);
       }
 
@@ -220,12 +222,26 @@ var ZaicoRequester = function () {
         }, _callee2, this);
       }));
 
-      function listToArrayWriter(_x4) {
+      function listToArrayWriter(_x5) {
         return _ref2.apply(this, arguments);
       }
 
       return listToArrayWriter;
     }()
+  }, {
+    key: '_dummy',
+    value: function _dummy(id) {
+      var res = { data: {} };
+      if (typeof id === 'string') res.data.data_id = id;
+      if ((typeof id === 'undefined' ? 'undefined' : _typeof(id)) === 'object') Object.assign(res.data, id);
+      if (!res.data.data_id && res.data.id) res.data.data_id = res.data.id;
+      if (!res.data.data_id && !res.data.id) {
+        var did = Math.random().toString(36).substring(7);
+        res.data.id = did;
+        res.data.data_id = did;
+      }
+      return res;
+    }
   }, {
     key: 'info',
     value: function () {
@@ -237,7 +253,9 @@ var ZaicoRequester = function () {
             switch (_context4.prev = _context4.next) {
               case 0:
                 _context4.next = 2;
-                return this._zaicoOperation(_asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3() {
+                return this._zaicoOperation(function () {
+                  return {};
+                }, _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3() {
                   return regeneratorRuntime.wrap(function _callee3$(_context3) {
                     while (1) {
                       switch (_context3.prev = _context3.next) {
@@ -269,7 +287,7 @@ var ZaicoRequester = function () {
         }, _callee4, this);
       }));
 
-      function info(_x5) {
+      function info(_x6) {
         return _ref3.apply(this, arguments);
       }
 
@@ -286,7 +304,9 @@ var ZaicoRequester = function () {
             switch (_context6.prev = _context6.next) {
               case 0:
                 _context6.next = 2;
-                return this._zaicoOperation(_asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5() {
+                return this._zaicoOperation(function () {
+                  return _this3._dummy(data);
+                }, _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5() {
                   return regeneratorRuntime.wrap(function _callee5$(_context5) {
                     while (1) {
                       switch (_context5.prev = _context5.next) {
@@ -320,7 +340,7 @@ var ZaicoRequester = function () {
         }, _callee6, this);
       }));
 
-      function add(_x6) {
+      function add(_x7) {
         return _ref5.apply(this, arguments);
       }
 
@@ -337,7 +357,9 @@ var ZaicoRequester = function () {
             switch (_context8.prev = _context8.next) {
               case 0:
                 _context8.next = 2;
-                return this._zaicoOperation(_asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee7() {
+                return this._zaicoOperation(function () {
+                  return _this4._dummy(data);
+                }, _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee7() {
                   return regeneratorRuntime.wrap(function _callee7$(_context7) {
                     while (1) {
                       switch (_context7.prev = _context7.next) {
@@ -371,7 +393,7 @@ var ZaicoRequester = function () {
         }, _callee8, this);
       }));
 
-      function update(_x7, _x8) {
+      function update(_x8, _x9) {
         return _ref7.apply(this, arguments);
       }
 
@@ -388,7 +410,9 @@ var ZaicoRequester = function () {
             switch (_context10.prev = _context10.next) {
               case 0:
                 _context10.next = 2;
-                return this._zaicoOperation(_asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9() {
+                return this._zaicoOperation(function () {
+                  return _this5._dummy(id);
+                }, _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9() {
                   return regeneratorRuntime.wrap(function _callee9$(_context9) {
                     while (1) {
                       switch (_context9.prev = _context9.next) {
@@ -422,7 +446,7 @@ var ZaicoRequester = function () {
         }, _callee10, this);
       }));
 
-      function remove(_x9, _x10) {
+      function remove(_x10, _x11) {
         return _ref9.apply(this, arguments);
       }
 

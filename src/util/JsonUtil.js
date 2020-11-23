@@ -1,4 +1,5 @@
-import fs from 'fs';
+import fs, { read } from 'fs';
+import { Readable } from 'stream';
 import JSONStream from 'JSONStream';
 import { resolve } from 'path';
 
@@ -43,13 +44,20 @@ export default class JsonUtil {
     }
   }
 
-  static toJSONArrayInputStream(path, ...writables) {
+  static toJSONArrayInputStream(path, ...dest) {
     this._existPath(path);
     const is = fs.createReadStream(path, 'utf-8');
-    return [JSONStream.parse('*'), ...writables].reduce((is, w) => is.pipe(w), is);
+    return [JSONStream.parse('*'), ...dest].reduce((is, w) => is.pipe(w), is);
   }
 
-  static createObjectArrayWriter(stream) {
-    return new ArrayWriter(stream);
+  static createObjectArrayWriter(path) {
+    return new ArrayWriter(fs.createWriteStream(path));
+  }
+
+  static createObjectArrayReadble(arr) {
+    const readable = new Readable({ objectMode: true, read() {}});
+    arr.forEach(e => readable.push(e));
+    readable.push(null);
+    return readable;
   }
 }

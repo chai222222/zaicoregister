@@ -4,6 +4,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -26,6 +28,10 @@ var _mime = require('mime');
 
 var _mime2 = _interopRequireDefault(_mime);
 
+var _JSONStream = require('JSONStream');
+
+var _JSONStream2 = _interopRequireDefault(_JSONStream);
+
 var _JsonUtil = require('./util/JsonUtil');
 
 var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
@@ -33,6 +39,18 @@ var _JsonUtil2 = _interopRequireDefault(_JsonUtil);
 var _ZaicoRequester = require('./ZaicoRequester');
 
 var _ZaicoRequester2 = _interopRequireDefault(_ZaicoRequester);
+
+var _EditManage = require('./EditManage');
+
+var _EditManage2 = _interopRequireDefault(_EditManage);
+
+var _combinedStream = require('combined-stream');
+
+var _combinedStream2 = _interopRequireDefault(_combinedStream);
+
+var _through2Filter = require('through2-filter');
+
+var _through2Filter2 = _interopRequireDefault(_through2Filter);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -53,8 +71,8 @@ var ZaioOpeBase = function () {
     this.config = config;
     this.options = options;
     this.context = {};
-    this.context.orgData = [];
     this.requester = new _ZaicoRequester2.default(config, options);
+    this._editManage = new _EditManage2.default(config.editTmpFile);
   }
 
   _createClass(ZaioOpeBase, [{
@@ -151,18 +169,28 @@ var ZaioOpeBase = function () {
       return data;
     }
   }, {
-    key: 'loadCacheData',
-    value: function loadCacheData() {
-      this.log('** read cahce', this.config.cacheFile);
-      this.context.data = _JsonUtil2.default.loadJson(this.config.cacheFile);
-      this.cloneData();
-    }
-  }, {
-    key: 'saveCacheData',
-    value: function saveCacheData() {
-      this.log('** write cahce', this.config.cacheFile);
-      _fs2.default.writeFileSync(this.config.cacheFile, JSON.stringify(this.context.data, null, '  '), 'utf-8');
-      this.cloneData();
+    key: 'updateCacheData',
+    value: function updateCacheData() {
+      var _this2 = this;
+
+      this.log('** update cahce', this.config.cacheFile);
+      return new Promise(function (resolve) {
+        _fs2.default.renameSync(_this2.config.cacheFile, _this2.config.cacheOldFile);
+        var dest = [];
+        if (_this2._editManage.counts(_EditManage2.default.DELETE)) dest.push(_this2._editManage.createDeletedFilter());
+        if (_this2._editManage.counts(_EditManage2.default.UPDATE)) dest.push(_this2._editManage.createUpdatedMapper());
+        var cacheFileStream = _JsonUtil2.default.toJSONArrayInputStream.apply(_JsonUtil2.default, [_this2.config.cacheOldFile].concat(dest));
+        (_this2._editManage.counts(_EditManage2.default.APPEND) ? function () {
+          var cs = _combinedStream2.default.create();
+          cs.append(cacheFileStream);
+          cs.append(_this2._editManage.createAppendedReadable());
+          return cs;
+        } : function () {
+          return cacheFileStream;
+        })().pipe(_JSONStream2.default.stringify()).pipe(_fs2.default.createWriteStream(_this2.config.cacheFile)).on('end', function () {
+          return resolve();
+        });
+      });
     }
   }, {
     key: 'removeCacheData',
@@ -174,20 +202,18 @@ var ZaioOpeBase = function () {
     key: 'zaicoDataToCache',
     value: function () {
       var _ref7 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
-        var out;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
                 this.log('** get all zaico data', this.config.cacheFile);
-                out = _fs2.default.createWriteStream(this.config.cacheFile);
-                _context.next = 4;
-                return this.requester.listToArrayWriter(_JsonUtil2.default.createObjectArrayWriter(out));
+                _context.next = 3;
+                return this.requester.listToArrayWriter(_JsonUtil2.default.createObjectArrayWriter(this.config.cacheFile));
 
-              case 4:
+              case 3:
                 return _context.abrupt('return', _context.sent);
 
-              case 5:
+              case 4:
               case 'end':
                 return _context.stop();
             }
@@ -207,35 +233,135 @@ var ZaioOpeBase = function () {
       return this.options.cache && this.config.cacheFile;
     }
   }, {
-    key: 'listZaico',
-    value: function listZaico(jan) {
-      var _this2 = this;
+    key: '_listZaico',
+    value: function () {
+      var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(fn) {
+        var _this3 = this;
 
-      return this.context.data.filter(function (z) {
-        return z[_this2.mappingKey('jan')] === jan;
-      });
-    }
+        var result;
+        return regeneratorRuntime.wrap(function _callee2$(_context2) {
+          while (1) {
+            switch (_context2.prev = _context2.next) {
+              case 0:
+                result = [];
+                return _context2.abrupt('return', new Promise(function (resolve) {
+                  _JsonUtil2.default.toJSONArrayInputStream(_this3.config.cacheFile).pipe((0, _through2Filter2.default)({ objectMode: true }, fn)).on('data', function (data) {
+                    return result.push(data);
+                  }).on('end', function () {
+                    return resolve(result);
+                  });
+                }));
+
+              case 2:
+              case 'end':
+                return _context2.stop();
+            }
+          }
+        }, _callee2, this);
+      }));
+
+      function _listZaico(_x) {
+        return _ref8.apply(this, arguments);
+      }
+
+      return _listZaico;
+    }()
+  }, {
+    key: 'listZaico',
+    value: function () {
+      var _ref9 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3(jan) {
+        var _this4 = this;
+
+        return regeneratorRuntime.wrap(function _callee3$(_context3) {
+          while (1) {
+            switch (_context3.prev = _context3.next) {
+              case 0:
+                _context3.next = 2;
+                return this._listZaico(function (z) {
+                  return z[_this4.mappingKey('jan')] === jan;
+                });
+
+              case 2:
+                return _context3.abrupt('return', _context3.sent);
+
+              case 3:
+              case 'end':
+                return _context3.stop();
+            }
+          }
+        }, _callee3, this);
+      }));
+
+      function listZaico(_x2) {
+        return _ref9.apply(this, arguments);
+      }
+
+      return listZaico;
+    }()
   }, {
     key: 'findZaicoByKey',
-    value: function findZaicoByKey(value, key) {
-      return this.context.data.find(function (z) {
-        return z[key] === value;
-      });
-    }
+    value: function () {
+      var _ref10 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee4(value, key) {
+        var res;
+        return regeneratorRuntime.wrap(function _callee4$(_context4) {
+          while (1) {
+            switch (_context4.prev = _context4.next) {
+              case 0:
+                _context4.next = 2;
+                return this._listZaico(function (z) {
+                  return z[key] === value;
+                });
+
+              case 2:
+                res = _context4.sent;
+                return _context4.abrupt('return', res.length > 0 && res[0]);
+
+              case 4:
+              case 'end':
+                return _context4.stop();
+            }
+          }
+        }, _callee4, this);
+      }));
+
+      function findZaicoByKey(_x3, _x4) {
+        return _ref10.apply(this, arguments);
+      }
+
+      return findZaicoByKey;
+    }()
   }, {
     key: 'findZaico',
-    value: function findZaico(jan) {
-      return this.findZaicoByKey(jan, this.mappingKey('jan'));
-    }
-  }, {
-    key: 'cloneData',
-    value: function cloneData() {
-      this.context.orgData = _lodash2.default.cloneDeep(this.context.data);
-    }
+    value: function () {
+      var _ref11 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5(jan) {
+        return regeneratorRuntime.wrap(function _callee5$(_context5) {
+          while (1) {
+            switch (_context5.prev = _context5.next) {
+              case 0:
+                _context5.next = 2;
+                return this.findZaicoByKey(jan, this.mappingKey('jan'));
+
+              case 2:
+                return _context5.abrupt('return', _context5.sent);
+
+              case 3:
+              case 'end':
+                return _context5.stop();
+            }
+          }
+        }, _callee5, this);
+      }));
+
+      function findZaico(_x5) {
+        return _ref11.apply(this, arguments);
+      }
+
+      return findZaico;
+    }()
   }, {
     key: 'isChangedData',
     value: function isChangedData() {
-      return !_lodash2.default.isEqual(this.context.data, this.context.orgData);
+      return this._editManage.isEdited();
     }
   }, {
     key: 'canProcess',
@@ -245,116 +371,20 @@ var ZaioOpeBase = function () {
   }, {
     key: 'beforeFiles',
     value: function () {
-      var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) {
-            switch (_context2.prev = _context2.next) {
-              case 0:
-                if (_fs2.default.existsSync(this.config.cacheFile)) {
-                  _context2.next = 3;
-                  break;
-                }
-
-                _context2.next = 3;
-                return this.zaicoDataToCache();
-
-              case 3:
-                this.loadCacheData();
-
-              case 4:
-              case 'end':
-                return _context2.stop();
-            }
-          }
-        }, _callee2, this);
-      }));
-
-      function beforeFiles() {
-        return _ref8.apply(this, arguments);
-      }
-
-      return beforeFiles;
-    }()
-  }, {
-    key: 'afterFiles',
-    value: function () {
-      var _ref9 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3() {
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) {
-            switch (_context3.prev = _context3.next) {
-              case 0:
-                if (this.useCache()) {
-                  if (this.isChangedData() && !this.options.dryrun) {
-                    this.saveCacheData();
-                  }
-                } else {
-                  this.removeCacheData();
-                }
-
-              case 1:
-              case 'end':
-                return _context3.stop();
-            }
-          }
-        }, _callee3, this);
-      }));
-
-      function afterFiles() {
-        return _ref9.apply(this, arguments);
-      }
-
-      return afterFiles;
-    }()
-  }, {
-    key: 'beforeRows',
-    value: function () {
-      var _ref10 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee4() {
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) {
-            switch (_context4.prev = _context4.next) {
-              case 0:
-              case 'end':
-                return _context4.stop();
-            }
-          }
-        }, _callee4, this);
-      }));
-
-      function beforeRows() {
-        return _ref10.apply(this, arguments);
-      }
-
-      return beforeRows;
-    }()
-  }, {
-    key: 'afterRows',
-    value: function () {
-      var _ref11 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee5() {
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) {
-            switch (_context5.prev = _context5.next) {
-              case 0:
-              case 'end':
-                return _context5.stop();
-            }
-          }
-        }, _callee5, this);
-      }));
-
-      function afterRows() {
-        return _ref11.apply(this, arguments);
-      }
-
-      return afterRows;
-    }()
-  }, {
-    key: 'beforeRow',
-    value: function () {
       var _ref12 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee6() {
         return regeneratorRuntime.wrap(function _callee6$(_context6) {
           while (1) {
             switch (_context6.prev = _context6.next) {
               case 0:
+                if (_fs2.default.existsSync(this.config.cacheFile)) {
+                  _context6.next = 3;
+                  break;
+                }
+
+                _context6.next = 3;
+                return this.zaicoDataToCache();
+
+              case 3:
               case 'end':
                 return _context6.stop();
             }
@@ -362,20 +392,45 @@ var ZaioOpeBase = function () {
         }, _callee6, this);
       }));
 
-      function beforeRow() {
+      function beforeFiles() {
         return _ref12.apply(this, arguments);
       }
 
-      return beforeRow;
+      return beforeFiles;
     }()
   }, {
-    key: 'afterRow',
+    key: 'afterFiles',
     value: function () {
       var _ref13 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee7() {
         return regeneratorRuntime.wrap(function _callee7$(_context7) {
           while (1) {
             switch (_context7.prev = _context7.next) {
               case 0:
+                _context7.next = 2;
+                return this._editManage.end();
+
+              case 2:
+                if (!this.useCache()) {
+                  _context7.next = 8;
+                  break;
+                }
+
+                if (!this.isChangedData()) {
+                  _context7.next = 6;
+                  break;
+                }
+
+                _context7.next = 6;
+                return this.updateCacheData();
+
+              case 6:
+                _context7.next = 9;
+                break;
+
+              case 8:
+                this.removeCacheData();
+
+              case 9:
               case 'end':
                 return _context7.stop();
             }
@@ -383,14 +438,14 @@ var ZaioOpeBase = function () {
         }, _callee7, this);
       }));
 
-      function afterRow() {
+      function afterFiles() {
         return _ref13.apply(this, arguments);
       }
 
-      return afterRow;
+      return afterFiles;
     }()
   }, {
-    key: 'eachRow',
+    key: 'beforeRows',
     value: function () {
       var _ref14 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee8() {
         return regeneratorRuntime.wrap(function _callee8$(_context8) {
@@ -404,58 +459,20 @@ var ZaioOpeBase = function () {
         }, _callee8, this);
       }));
 
-      function eachRow() {
+      function beforeRows() {
         return _ref14.apply(this, arguments);
       }
 
-      return eachRow;
+      return beforeRows;
     }()
   }, {
-    key: 'updateDatum',
+    key: 'afterRows',
     value: function () {
-      var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9(id) {
-        var del = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-        var getRes, idx;
+      var _ref15 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee9() {
         return regeneratorRuntime.wrap(function _callee9$(_context9) {
           while (1) {
             switch (_context9.prev = _context9.next) {
               case 0:
-                if (!this.useCache()) {
-                  _context9.next = 9;
-                  break;
-                }
-
-                if (!del) {
-                  _context9.next = 5;
-                  break;
-                }
-
-                this.context.data = this.context.data.filter(function (row) {
-                  return row.id !== id;
-                });
-                _context9.next = 9;
-                break;
-
-              case 5:
-                _context9.next = 7;
-                return this.requester.info(id);
-
-              case 7:
-                getRes = _context9.sent;
-
-                if (!_lodash2.default.isEmpty(getRes)) {
-                  idx = this.context.data.findIndex(function (row) {
-                    return row.id === id;
-                  });
-
-                  if (idx >= 0) {
-                    this.context.data[idx] = getRes.data;
-                  } else {
-                    this.context.data.push(getRes.data);
-                  }
-                }
-
-              case 9:
               case 'end':
                 return _context9.stop();
             }
@@ -463,43 +480,20 @@ var ZaioOpeBase = function () {
         }, _callee9, this);
       }));
 
-      function updateDatum(_x) {
+      function afterRows() {
         return _ref15.apply(this, arguments);
       }
 
-      return updateDatum;
+      return afterRows;
     }()
   }, {
-    key: 'processFiles',
+    key: 'beforeRow',
     value: function () {
-      var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10(filePaths) {
+      var _ref16 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee10() {
         return regeneratorRuntime.wrap(function _callee10$(_context10) {
           while (1) {
             switch (_context10.prev = _context10.next) {
               case 0:
-                if (this.canProcess(filePaths)) {
-                  _context10.next = 2;
-                  break;
-                }
-
-                return _context10.abrupt('return', false);
-
-              case 2:
-                _context10.next = 4;
-                return this.beforeFiles();
-
-              case 4:
-                _context10.next = 6;
-                return this._processFiles(filePaths);
-
-              case 6:
-                _context10.next = 8;
-                return this.afterFiles();
-
-              case 8:
-                return _context10.abrupt('return', true);
-
-              case 9:
               case 'end':
                 return _context10.stop();
             }
@@ -507,49 +501,41 @@ var ZaioOpeBase = function () {
         }, _callee10, this);
       }));
 
-      function processFiles(_x3) {
+      function beforeRow() {
         return _ref16.apply(this, arguments);
       }
 
-      return processFiles;
+      return beforeRow;
     }()
   }, {
-    key: '_processFiles',
+    key: 'afterRow',
     value: function () {
-      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12(filePaths) {
-        var _this3 = this;
+      var _ref17 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11() {
+        return regeneratorRuntime.wrap(function _callee11$(_context11) {
+          while (1) {
+            switch (_context11.prev = _context11.next) {
+              case 0:
+              case 'end':
+                return _context11.stop();
+            }
+          }
+        }, _callee11, this);
+      }));
 
+      function afterRow() {
+        return _ref17.apply(this, arguments);
+      }
+
+      return afterRow;
+    }()
+  }, {
+    key: 'eachRow',
+    value: function () {
+      var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee12() {
         return regeneratorRuntime.wrap(function _callee12$(_context12) {
           while (1) {
             switch (_context12.prev = _context12.next) {
               case 0:
-                _context12.next = 2;
-                return (0, _pIteration.forEachSeries)(filePaths, function () {
-                  var _ref18 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee11(f) {
-                    return regeneratorRuntime.wrap(function _callee11$(_context11) {
-                      while (1) {
-                        switch (_context11.prev = _context11.next) {
-                          case 0:
-                            _context11.next = 2;
-                            return _this3._processFile(f);
-
-                          case 2:
-                            return _context11.abrupt('return', _context11.sent);
-
-                          case 3:
-                          case 'end':
-                            return _context11.stop();
-                        }
-                      }
-                    }, _callee11, _this3);
-                  }));
-
-                  return function (_x5) {
-                    return _ref18.apply(this, arguments);
-                  };
-                }());
-
-              case 2:
               case 'end':
                 return _context12.stop();
             }
@@ -557,8 +543,156 @@ var ZaioOpeBase = function () {
         }, _callee12, this);
       }));
 
-      function _processFiles(_x4) {
-        return _ref17.apply(this, arguments);
+      function eachRow() {
+        return _ref18.apply(this, arguments);
+      }
+
+      return eachRow;
+    }()
+  }, {
+    key: 'updateDatum',
+    value: function () {
+      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(mode, id, data) {
+        var getRes, dummy;
+        return regeneratorRuntime.wrap(function _callee13$(_context13) {
+          while (1) {
+            switch (_context13.prev = _context13.next) {
+              case 0:
+                if (!this.useCache()) {
+                  _context13.next = 9;
+                  break;
+                }
+
+                if (!(mode === _EditManage2.default.DELETE)) {
+                  _context13.next = 5;
+                  break;
+                }
+
+                this._editManage.addData(mode, { id: id });
+                _context13.next = 9;
+                break;
+
+              case 5:
+                _context13.next = 7;
+                return this.requester.info(id);
+
+              case 7:
+                getRes = _context13.sent;
+
+                if (!_lodash2.default.isEmpty(getRes)) {
+                  this._editManage.addData(mode, getRes.data);
+                } else if (this.options.dryrun) {
+                  dummy = _extends({}, data, { id: id });
+
+                  delete dummy.item_image;
+                  dummy.updated_at = '2222-22-22T22:22:22+09:00';
+                  this._editManage.addData(mode, dummy);
+                }
+
+              case 9:
+              case 'end':
+                return _context13.stop();
+            }
+          }
+        }, _callee13, this);
+      }));
+
+      function updateDatum(_x6, _x7, _x8) {
+        return _ref19.apply(this, arguments);
+      }
+
+      return updateDatum;
+    }()
+  }, {
+    key: 'processFiles',
+    value: function () {
+      var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePaths) {
+        return regeneratorRuntime.wrap(function _callee14$(_context14) {
+          while (1) {
+            switch (_context14.prev = _context14.next) {
+              case 0:
+                if (this.canProcess(filePaths)) {
+                  _context14.next = 2;
+                  break;
+                }
+
+                return _context14.abrupt('return', false);
+
+              case 2:
+                _context14.next = 4;
+                return this.beforeFiles();
+
+              case 4:
+                _context14.next = 6;
+                return this._processFiles(filePaths);
+
+              case 6:
+                _context14.next = 8;
+                return this.afterFiles();
+
+              case 8:
+                return _context14.abrupt('return', true);
+
+              case 9:
+              case 'end':
+                return _context14.stop();
+            }
+          }
+        }, _callee14, this);
+      }));
+
+      function processFiles(_x9) {
+        return _ref20.apply(this, arguments);
+      }
+
+      return processFiles;
+    }()
+  }, {
+    key: '_processFiles',
+    value: function () {
+      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(filePaths) {
+        var _this5 = this;
+
+        return regeneratorRuntime.wrap(function _callee16$(_context16) {
+          while (1) {
+            switch (_context16.prev = _context16.next) {
+              case 0:
+                _context16.next = 2;
+                return (0, _pIteration.forEachSeries)(filePaths, function () {
+                  var _ref22 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(f) {
+                    return regeneratorRuntime.wrap(function _callee15$(_context15) {
+                      while (1) {
+                        switch (_context15.prev = _context15.next) {
+                          case 0:
+                            _context15.next = 2;
+                            return _this5._processFile(f);
+
+                          case 2:
+                            return _context15.abrupt('return', _context15.sent);
+
+                          case 3:
+                          case 'end':
+                            return _context15.stop();
+                        }
+                      }
+                    }, _callee15, _this5);
+                  }));
+
+                  return function (_x11) {
+                    return _ref22.apply(this, arguments);
+                  };
+                }());
+
+              case 2:
+              case 'end':
+                return _context16.stop();
+            }
+          }
+        }, _callee16, this);
+      }));
+
+      function _processFiles(_x10) {
+        return _ref21.apply(this, arguments);
       }
 
       return _processFiles;
@@ -566,13 +700,13 @@ var ZaioOpeBase = function () {
   }, {
     key: '_processFile',
     value: function () {
-      var _ref19 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee14(filePath) {
-        var _this4 = this;
+      var _ref23 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(filePath) {
+        var _this6 = this;
 
         var jangetterResult, rows;
-        return regeneratorRuntime.wrap(function _callee14$(_context14) {
+        return regeneratorRuntime.wrap(function _callee18$(_context18) {
           while (1) {
-            switch (_context14.prev = _context14.next) {
+            switch (_context18.prev = _context18.next) {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
@@ -582,52 +716,52 @@ var ZaioOpeBase = function () {
                 rows = jangetterResult.rows;
 
                 if (!Array.isArray(rows)) {
-                  _context14.next = 14;
+                  _context18.next = 14;
                   break;
                 }
 
-                _context14.next = 8;
+                _context18.next = 8;
                 return this.beforeRows(rows);
 
               case 8:
-                _context14.next = 10;
+                _context18.next = 10;
                 return (0, _pIteration.forEachSeries)(rows, function () {
-                  var _ref20 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee13(row, idx) {
-                    return regeneratorRuntime.wrap(function _callee13$(_context13) {
+                  var _ref24 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row, idx) {
+                    return regeneratorRuntime.wrap(function _callee17$(_context17) {
                       while (1) {
-                        switch (_context13.prev = _context13.next) {
+                        switch (_context17.prev = _context17.next) {
                           case 0:
-                            _context13.next = 2;
-                            return _this4.beforeRow(row);
+                            _context17.next = 2;
+                            return _this6.beforeRow(row);
 
                           case 2:
-                            _this4.log('* [' + (idx + 1) + '/' + rows.length + ']', row.title);
-                            _context13.next = 5;
-                            return _this4.eachRow(row);
+                            _this6.log('* [' + (idx + 1) + '/' + rows.length + ']', row.title);
+                            _context17.next = 5;
+                            return _this6.eachRow(row);
 
                           case 5:
-                            _context13.next = 7;
-                            return _this4.afterRow(row);
+                            _context17.next = 7;
+                            return _this6.afterRow(row);
 
                           case 7:
                           case 'end':
-                            return _context13.stop();
+                            return _context17.stop();
                         }
                       }
-                    }, _callee13, _this4);
+                    }, _callee17, _this6);
                   }));
 
-                  return function (_x7, _x8) {
-                    return _ref20.apply(this, arguments);
+                  return function (_x13, _x14) {
+                    return _ref24.apply(this, arguments);
                   };
                 }());
 
               case 10:
-                _context14.next = 12;
+                _context18.next = 12;
                 return this.afterRows(rows);
 
               case 12:
-                _context14.next = 15;
+                _context18.next = 15;
                 break;
 
               case 14:
@@ -635,14 +769,14 @@ var ZaioOpeBase = function () {
 
               case 15:
               case 'end':
-                return _context14.stop();
+                return _context18.stop();
             }
           }
-        }, _callee14, this);
+        }, _callee18, this);
       }));
 
-      function _processFile(_x6) {
-        return _ref19.apply(this, arguments);
+      function _processFile(_x12) {
+        return _ref23.apply(this, arguments);
       }
 
       return _processFile;
@@ -677,30 +811,35 @@ var VerifyOperation = function (_ZaioOpeBase) {
   _createClass(VerifyOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref21 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee15(row) {
-        var msgs, list, msg;
-        return regeneratorRuntime.wrap(function _callee15$(_context15) {
+      var _ref25 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19(row) {
+        var janKey, msgs, list, msg;
+        return regeneratorRuntime.wrap(function _callee19$(_context19) {
           while (1) {
-            switch (_context15.prev = _context15.next) {
+            switch (_context19.prev = _context19.next) {
               case 0:
+                janKey = this.mappingKey('jan');
                 msgs = ['未登録', '登録済み', '**複数登録済み**'];
-                list = this.listZaico(row.jan);
+                _context19.next = 4;
+                return this.listZaico(row.jan);
+
+              case 4:
+                list = _context19.sent;
                 msg = msgs[list.length > 1 ? 2 : list.length];
 
                 this.log(msg, list.map(function (row) {
-                  return row.jan;
+                  return row[janKey];
                 }).join(','));
 
-              case 4:
+              case 7:
               case 'end':
-                return _context15.stop();
+                return _context19.stop();
             }
           }
-        }, _callee15, this);
+        }, _callee19, this);
       }));
 
-      function eachRow(_x9) {
-        return _ref21.apply(this, arguments);
+      function eachRow(_x15) {
+        return _ref25.apply(this, arguments);
       }
 
       return eachRow;
@@ -722,46 +861,60 @@ var AddOperation = function (_ZaioOpeBase2) {
   _createClass(AddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref22 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee16(row) {
+      var _ref26 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20(row) {
         var data, res;
-        return regeneratorRuntime.wrap(function _callee16$(_context16) {
+        return regeneratorRuntime.wrap(function _callee20$(_context20) {
           while (1) {
-            switch (_context16.prev = _context16.next) {
+            switch (_context20.prev = _context20.next) {
               case 0:
-                if (!(!this.options.force && this.findZaico(row.jan))) {
-                  _context16.next = 3;
+                _context20.t0 = !this.options.force;
+
+                if (!_context20.t0) {
+                  _context20.next = 5;
+                  break;
+                }
+
+                _context20.next = 4;
+                return this.findZaico(row.jan);
+
+              case 4:
+                _context20.t0 = _context20.sent;
+
+              case 5:
+                if (!_context20.t0) {
+                  _context20.next = 8;
                   break;
                 }
 
                 this.log('すでにJANが登録されています', row.jan, row.title);
-                return _context16.abrupt('return');
+                return _context20.abrupt('return');
 
-              case 3:
+              case 8:
                 data = this.createRequestData('add', row);
-                _context16.next = 6;
+                _context20.next = 11;
                 return this.requester.add(data);
 
-              case 6:
-                res = _context16.sent;
+              case 11:
+                res = _context20.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context16.next = 10;
+                  _context20.next = 15;
                   break;
                 }
 
-                _context16.next = 10;
-                return this.updateDatum(res.data.data_id);
+                _context20.next = 15;
+                return this.updateDatum(_EditManage2.default.APPEND, res.data.data_id, data);
 
-              case 10:
+              case 15:
               case 'end':
-                return _context16.stop();
+                return _context20.stop();
             }
           }
-        }, _callee16, this);
+        }, _callee20, this);
       }));
 
-      function eachRow(_x10) {
-        return _ref22.apply(this, arguments);
+      function eachRow(_x16) {
+        return _ref26.apply(this, arguments);
       }
 
       return eachRow;
@@ -783,63 +936,67 @@ var UpdateOperation = function (_ZaioOpeBase3) {
   _createClass(UpdateOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref23 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row) {
+      var _ref27 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee21(row) {
         var found, data, res;
-        return regeneratorRuntime.wrap(function _callee17$(_context17) {
+        return regeneratorRuntime.wrap(function _callee21$(_context21) {
           while (1) {
-            switch (_context17.prev = _context17.next) {
+            switch (_context21.prev = _context21.next) {
               case 0:
-                found = this.findZaico(row.jan);
+                _context21.next = 2;
+                return this.findZaico(row.jan);
+
+              case 2:
+                found = _context21.sent;
 
                 if (!found) {
-                  _context17.next = 12;
+                  _context21.next = 14;
                   break;
                 }
 
                 data = this.createRequestData('update', row, found);
 
-                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref24) {
-                  var _ref25 = _slicedToArray(_ref24, 2),
-                      k = _ref25[0],
-                      v = _ref25[1];
+                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref28) {
+                  var _ref29 = _slicedToArray(_ref28, 2),
+                      k = _ref29[0],
+                      v = _ref29[1];
 
                   return _lodash2.default.isEqual(v, found[k]);
                 }))) {
-                  _context17.next = 10;
+                  _context21.next = 12;
                   break;
                 }
 
-                _context17.next = 6;
+                _context21.next = 8;
                 return this.requester.update(found.id, data);
 
-              case 6:
-                res = _context17.sent;
+              case 8:
+                res = _context21.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context17.next = 10;
+                  _context21.next = 12;
                   break;
                 }
 
-                _context17.next = 10;
-                return this.updateDatum(found.id);
-
-              case 10:
-                _context17.next = 13;
-                break;
+                _context21.next = 12;
+                return this.updateDatum(_EditManage2.default.UPDATE, found.id, found);
 
               case 12:
+                _context21.next = 15;
+                break;
+
+              case 14:
                 this.log('未登録のため更新できません', row.jan, row.title);
 
-              case 13:
+              case 15:
               case 'end':
-                return _context17.stop();
+                return _context21.stop();
             }
           }
-        }, _callee17, this);
+        }, _callee21, this);
       }));
 
-      function eachRow(_x11) {
-        return _ref23.apply(this, arguments);
+      function eachRow(_x17) {
+        return _ref27.apply(this, arguments);
       }
 
       return eachRow;
@@ -861,77 +1018,81 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
   _createClass(UpdateOrAddOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref26 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee18(row) {
+      var _ref30 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee22(row) {
         var found, data, res, _data, _res;
 
-        return regeneratorRuntime.wrap(function _callee18$(_context18) {
+        return regeneratorRuntime.wrap(function _callee22$(_context22) {
           while (1) {
-            switch (_context18.prev = _context18.next) {
+            switch (_context22.prev = _context22.next) {
               case 0:
-                found = this.findZaico(row.jan);
+                _context22.next = 2;
+                return this.findZaico(row.jan);
+
+              case 2:
+                found = _context22.sent;
 
                 if (!found) {
-                  _context18.next = 12;
+                  _context22.next = 14;
                   break;
                 }
 
                 data = this.createRequestData('update', row, found);
 
-                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref27) {
-                  var _ref28 = _slicedToArray(_ref27, 2),
-                      k = _ref28[0],
-                      v = _ref28[1];
+                if (!(this.options.force || !_lodash2.default.toPairs(data).every(function (_ref31) {
+                  var _ref32 = _slicedToArray(_ref31, 2),
+                      k = _ref32[0],
+                      v = _ref32[1];
 
                   return _lodash2.default.isEqual(v, found[k]);
                 }))) {
-                  _context18.next = 10;
+                  _context22.next = 12;
                   break;
                 }
 
-                _context18.next = 6;
+                _context22.next = 8;
                 return this.requester.update(found.id, data);
 
-              case 6:
-                res = _context18.sent;
+              case 8:
+                res = _context22.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context18.next = 10;
+                  _context22.next = 12;
                   break;
                 }
 
-                _context18.next = 10;
-                return this.updateDatum(found.id);
-
-              case 10:
-                _context18.next = 19;
-                break;
+                _context22.next = 12;
+                return this.updateDatum(_EditManage2.default.UPDATE, found.id, found);
 
               case 12:
+                _context22.next = 21;
+                break;
+
+              case 14:
                 _data = this.createRequestData('add', row);
-                _context18.next = 15;
+                _context22.next = 17;
                 return this.requester.add(_data);
 
-              case 15:
-                _res = _context18.sent;
+              case 17:
+                _res = _context22.sent;
 
                 if (_lodash2.default.isEmpty(_res)) {
-                  _context18.next = 19;
+                  _context22.next = 21;
                   break;
                 }
 
-                _context18.next = 19;
-                return this.updateDatum(_res.data.data_id);
+                _context22.next = 21;
+                return this.updateDatum(_EditManage2.default.APPEND, _res.data.data_id, _data);
 
-              case 19:
+              case 21:
               case 'end':
-                return _context18.stop();
+                return _context22.stop();
             }
           }
-        }, _callee18, this);
+        }, _callee22, this);
       }));
 
-      function eachRow(_x12) {
-        return _ref26.apply(this, arguments);
+      function eachRow(_x18) {
+        return _ref30.apply(this, arguments);
       }
 
       return eachRow;
@@ -953,50 +1114,54 @@ var DeleteOperation = function (_ZaioOpeBase5) {
   _createClass(DeleteOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref29 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee19(row) {
+      var _ref33 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee23(row) {
         var found, res;
-        return regeneratorRuntime.wrap(function _callee19$(_context19) {
+        return regeneratorRuntime.wrap(function _callee23$(_context23) {
           while (1) {
-            switch (_context19.prev = _context19.next) {
+            switch (_context23.prev = _context23.next) {
               case 0:
-                found = this.findZaico(row.jan);
+                _context23.next = 2;
+                return this.findZaico(row.jan);
+
+              case 2:
+                found = _context23.sent;
 
                 if (!found) {
-                  _context19.next = 10;
+                  _context23.next = 12;
                   break;
                 }
 
-                _context19.next = 4;
+                _context23.next = 6;
                 return this.requester.remove(found.id, row.jan);
 
-              case 4:
-                res = _context19.sent;
+              case 6:
+                res = _context23.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context19.next = 8;
+                  _context23.next = 10;
                   break;
                 }
 
-                _context19.next = 8;
-                return this.updateDatum(found.id, true);
-
-              case 8:
-                _context19.next = 11;
-                break;
+                _context23.next = 10;
+                return this.updateDatum(_EditManage2.default.DELETE, found.id);
 
               case 10:
+                _context23.next = 13;
+                break;
+
+              case 12:
                 this.log('未登録のため削除できません', row.jan, row.title);
 
-              case 11:
+              case 13:
               case 'end':
-                return _context19.stop();
+                return _context23.stop();
             }
           }
-        }, _callee19, this);
+        }, _callee23, this);
       }));
 
-      function eachRow(_x13) {
-        return _ref29.apply(this, arguments);
+      function eachRow(_x19) {
+        return _ref33.apply(this, arguments);
       }
 
       return eachRow;
@@ -1018,24 +1183,24 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   _createClass(CacheUpdateOperation, [{
     key: 'beforeFiles',
     value: function () {
-      var _ref30 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee20() {
-        return regeneratorRuntime.wrap(function _callee20$(_context20) {
+      var _ref34 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
+        return regeneratorRuntime.wrap(function _callee24$(_context24) {
           while (1) {
-            switch (_context20.prev = _context20.next) {
+            switch (_context24.prev = _context24.next) {
               case 0:
-                _context20.next = 2;
+                _context24.next = 2;
                 return this.zaicoDataToCache();
 
               case 2:
               case 'end':
-                return _context20.stop();
+                return _context24.stop();
             }
           }
-        }, _callee20, this);
+        }, _callee24, this);
       }));
 
       function beforeFiles() {
-        return _ref30.apply(this, arguments);
+        return _ref34.apply(this, arguments);
       }
 
       return beforeFiles;
@@ -1043,20 +1208,20 @@ var CacheUpdateOperation = function (_ZaioOpeBase6) {
   }, {
     key: '_processFiles',
     value: function () {
-      var _ref31 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee21() {
-        return regeneratorRuntime.wrap(function _callee21$(_context21) {
+      var _ref35 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee25() {
+        return regeneratorRuntime.wrap(function _callee25$(_context25) {
           while (1) {
-            switch (_context21.prev = _context21.next) {
+            switch (_context25.prev = _context25.next) {
               case 0:
               case 'end':
-                return _context21.stop();
+                return _context25.stop();
             }
           }
-        }, _callee21, this);
+        }, _callee25, this);
       }));
 
       function _processFiles() {
-        return _ref31.apply(this, arguments);
+        return _ref35.apply(this, arguments);
       }
 
       return _processFiles;
@@ -1103,32 +1268,119 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
       return true;
     }
   }, {
-    key: '_processFiles',
+    key: '_createJanCountObj',
     value: function () {
-      var _ref32 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee24() {
-        var _this12 = this;
+      var _ref36 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee26() {
+        var _this14 = this;
 
-        var janKey, jan2DataArr, removeJan;
-        return regeneratorRuntime.wrap(function _callee24$(_context24) {
+        var janKey, obj;
+        return regeneratorRuntime.wrap(function _callee26$(_context26) {
           while (1) {
-            switch (_context24.prev = _context24.next) {
+            switch (_context26.prev = _context26.next) {
               case 0:
                 janKey = this.mappingKey('jan');
-                jan2DataArr = this.context.data.reduce(function (o, val) {
-                  (o[val[janKey]] || (o[val[janKey]] = [])).push(val);
-                  return o;
-                }, {});
-                removeJan = _lodash2.default.toPairs(jan2DataArr).map(function (_ref33) {
-                  var _ref34 = _slicedToArray(_ref33, 2),
-                      jan = _ref34[0],
-                      arr = _ref34[1];
+                obj = {};
+                return _context26.abrupt('return', new Promise(function (resolve) {
+                  _JsonUtil2.default.toJSONArrayInputStream(_this14.config.cacheFile).on('data', function (data) {
+                    var jan = data[janKey];
+                    if (obj[jan]) {
+                      obj[jan]++;
+                    } else {
+                      obj[jan] = 1;
+                    }
+                  }).on('end', function () {
+                    return resolve(obj);
+                  });
+                }));
 
-                  if (arr.length === 1) return undefined;
+              case 3:
+              case 'end':
+                return _context26.stop();
+            }
+          }
+        }, _callee26, this);
+      }));
+
+      function _createJanCountObj() {
+        return _ref36.apply(this, arguments);
+      }
+
+      return _createJanCountObj;
+    }()
+  }, {
+    key: '_createDupJan2Data',
+    value: function () {
+      var _ref37 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee27(janCountsObj) {
+        var _this15 = this;
+
+        var janKey, obj;
+        return regeneratorRuntime.wrap(function _callee27$(_context27) {
+          while (1) {
+            switch (_context27.prev = _context27.next) {
+              case 0:
+                janKey = this.mappingKey('jan');
+                obj = {};
+                return _context27.abrupt('return', new Promise(function (resolve) {
+                  _JsonUtil2.default.toJSONArrayInputStream(_this15.config.cacheFile).pipe((0, _through2Filter2.default)({ objectMode: true }, function (data) {
+                    return janCountsObj[data[janKey]] > 1;
+                  })).on('data', function (data) {
+                    var jan = data[janKey];
+                    if (obj[jan]) {
+                      obj[jan].push(data);
+                    } else {
+                      obj[jan] = [data];
+                    }
+                  }).on('end', function () {
+                    return resolve(obj);
+                  });
+                }));
+
+              case 3:
+              case 'end':
+                return _context27.stop();
+            }
+          }
+        }, _callee27, this);
+      }));
+
+      function _createDupJan2Data(_x20) {
+        return _ref37.apply(this, arguments);
+      }
+
+      return _createDupJan2Data;
+    }()
+  }, {
+    key: '_processFiles',
+    value: function () {
+      var _ref38 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee30() {
+        var _this16 = this;
+
+        var janCounts, dupJanObj, removeJan;
+        return regeneratorRuntime.wrap(function _callee30$(_context30) {
+          while (1) {
+            switch (_context30.prev = _context30.next) {
+              case 0:
+                _context30.next = 2;
+                return this._createJanCountObj();
+
+              case 2:
+                janCounts = _context30.sent;
+                _context30.next = 5;
+                return this._createDupJan2Data(janCounts);
+
+              case 5:
+                dupJanObj = _context30.sent;
+                removeJan = _lodash2.default.toPairs(dupJanObj).map(function (_ref39) {
+                  var _ref40 = _slicedToArray(_ref39, 2),
+                      jan = _ref40[0],
+                      arr = _ref40[1];
+
+                  if (arr.length === 1) return undefined; // フィルタしてるので必ず複数だけど前のままにする
                   var data = arr.filter(function (v) {
                     return v.created_at === v.updated_at;
                   });
                   if (data.length === arr.length) {
-                    var _options = _this12.options,
+                    var _options = _this16.options,
                         latest = _options.latest,
                         oldest = _options.oldest,
                         force = _options.force;
@@ -1136,7 +1388,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     if (latest) return { jan: jan, data: data.slice(0, data.length - 1) };
                     if (oldest) return { jan: jan, data: data.slice(1, data.length) };
                     if (!force) {
-                      _this12.log.apply(_this12, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
+                      _this16.log.apply(_this16, ['\u91CD\u8907\u3057\u305FJAN\u306E\u5168\u3066\u304C\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u540C\u3058\u3067\u3059[' + jan + ']'].concat(_toConsumableArray(arr.map(function (v) {
                         return v.id;
                       }))));
                       return undefined;
@@ -1145,7 +1397,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     var res = arr.filter(function (v) {
                       return v.created_at !== v.updated_at;
                     });
-                    _this12.log.apply(_this12, ['\u91CD\u8907\u3057\u305FJAN\u306B\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u9055\u3046\u3082\u306E\u304C\u8907\u6570\u542B\u307E\u308C\u307E\u3059\u3002\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u66F4\u65B0\u3057\u3001verify\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055[' + jan + ']'].concat(_toConsumableArray(res.map(function (v) {
+                    _this16.log.apply(_this16, ['\u91CD\u8907\u3057\u305FJAN\u306B\u4F5C\u6210\u65E5\u30FB\u4FEE\u6B63\u65E5\u304C\u9055\u3046\u3082\u306E\u304C\u8907\u6570\u542B\u307E\u308C\u307E\u3059\u3002\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u66F4\u65B0\u3057\u3001verify\u3067\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055[' + jan + ']'].concat(_toConsumableArray(res.map(function (v) {
                       return v.id;
                     }))));
                   }
@@ -1153,73 +1405,73 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                 }).filter(function (v) {
                   return v !== undefined;
                 });
-                _context24.next = 5;
+                _context30.next = 9;
                 return (0, _pIteration.forEachSeries)(removeJan, function () {
-                  var _ref35 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee23(_ref36) {
-                    var jan = _ref36.jan,
-                        data = _ref36.data;
-                    return regeneratorRuntime.wrap(function _callee23$(_context23) {
+                  var _ref41 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee29(_ref42) {
+                    var jan = _ref42.jan,
+                        data = _ref42.data;
+                    return regeneratorRuntime.wrap(function _callee29$(_context29) {
                       while (1) {
-                        switch (_context23.prev = _context23.next) {
+                        switch (_context29.prev = _context29.next) {
                           case 0:
-                            _context23.next = 2;
+                            _context29.next = 2;
                             return (0, _pIteration.forEachSeries)(data, function () {
-                              var _ref37 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee22(d) {
+                              var _ref43 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee28(d) {
                                 var res;
-                                return regeneratorRuntime.wrap(function _callee22$(_context22) {
+                                return regeneratorRuntime.wrap(function _callee28$(_context28) {
                                   while (1) {
-                                    switch (_context22.prev = _context22.next) {
+                                    switch (_context28.prev = _context28.next) {
                                       case 0:
-                                        _context22.next = 2;
-                                        return _this12.requester.remove(d.id, jan);
+                                        _context28.next = 2;
+                                        return _this16.requester.remove(d.id, jan);
 
                                       case 2:
-                                        res = _context22.sent;
+                                        res = _context28.sent;
 
                                         if (_lodash2.default.isEmpty(res)) {
-                                          _context22.next = 6;
+                                          _context28.next = 6;
                                           break;
                                         }
 
-                                        _context22.next = 6;
-                                        return _this12.updateDatum(d.id, true);
+                                        _context28.next = 6;
+                                        return _this16.updateDatum(_EditManage2.default.DELETE, d.id);
 
                                       case 6:
                                       case 'end':
-                                        return _context22.stop();
+                                        return _context28.stop();
                                     }
                                   }
-                                }, _callee22, _this12);
+                                }, _callee28, _this16);
                               }));
 
-                              return function (_x15) {
-                                return _ref37.apply(this, arguments);
+                              return function (_x22) {
+                                return _ref43.apply(this, arguments);
                               };
                             }());
 
                           case 2:
                           case 'end':
-                            return _context23.stop();
+                            return _context29.stop();
                         }
                       }
-                    }, _callee23, _this12);
+                    }, _callee29, _this16);
                   }));
 
-                  return function (_x14) {
-                    return _ref35.apply(this, arguments);
+                  return function (_x21) {
+                    return _ref41.apply(this, arguments);
                   };
                 }());
 
-              case 5:
+              case 9:
               case 'end':
-                return _context24.stop();
+                return _context30.stop();
             }
           }
-        }, _callee24, this);
+        }, _callee30, this);
       }));
 
       function _processFiles() {
-        return _ref32.apply(this, arguments);
+        return _ref38.apply(this, arguments);
       }
 
       return _processFiles;
@@ -1241,13 +1493,13 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
   _createClass(CacheFileOperationBase, [{
     key: '_processFile',
     value: function () {
-      var _ref38 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee26(filePath) {
-        var _this14 = this;
+      var _ref44 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee32(filePath) {
+        var _this18 = this;
 
         var zaicos;
-        return regeneratorRuntime.wrap(function _callee26$(_context26) {
+        return regeneratorRuntime.wrap(function _callee32$(_context32) {
           while (1) {
-            switch (_context26.prev = _context26.next) {
+            switch (_context32.prev = _context32.next) {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
@@ -1256,52 +1508,52 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
                 this.log('*** cacheファイル操作 ***');
 
                 if (!Array.isArray(zaicos)) {
-                  _context26.next = 13;
+                  _context32.next = 13;
                   break;
                 }
 
-                _context26.next = 7;
+                _context32.next = 7;
                 return this.beforeRows(zaicos);
 
               case 7:
-                _context26.next = 9;
+                _context32.next = 9;
                 return (0, _pIteration.forEachSeries)(zaicos, function () {
-                  var _ref39 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee25(zaico, idx) {
-                    return regeneratorRuntime.wrap(function _callee25$(_context25) {
+                  var _ref45 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee31(zaico, idx) {
+                    return regeneratorRuntime.wrap(function _callee31$(_context31) {
                       while (1) {
-                        switch (_context25.prev = _context25.next) {
+                        switch (_context31.prev = _context31.next) {
                           case 0:
-                            _context25.next = 2;
-                            return _this14.beforeRow(zaico);
+                            _context31.next = 2;
+                            return _this18.beforeRow(zaico);
 
                           case 2:
-                            _this14.log('* [' + (idx + 1) + '/' + zaicos.length + ']', zaico.title);
-                            _context25.next = 5;
-                            return _this14.eachRow(zaico);
+                            _this18.log('* [' + (idx + 1) + '/' + zaicos.length + ']', zaico.title);
+                            _context31.next = 5;
+                            return _this18.eachRow(zaico);
 
                           case 5:
-                            _context25.next = 7;
-                            return _this14.afterRow(zaico);
+                            _context31.next = 7;
+                            return _this18.afterRow(zaico);
 
                           case 7:
                           case 'end':
-                            return _context25.stop();
+                            return _context31.stop();
                         }
                       }
-                    }, _callee25, _this14);
+                    }, _callee31, _this18);
                   }));
 
-                  return function (_x17, _x18) {
-                    return _ref39.apply(this, arguments);
+                  return function (_x24, _x25) {
+                    return _ref45.apply(this, arguments);
                   };
                 }());
 
               case 9:
-                _context26.next = 11;
+                _context32.next = 11;
                 return this.afterRows(zaicos);
 
               case 11:
-                _context26.next = 14;
+                _context32.next = 14;
                 break;
 
               case 13:
@@ -1309,14 +1561,14 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
 
               case 14:
               case 'end':
-                return _context26.stop();
+                return _context32.stop();
             }
           }
-        }, _callee26, this);
+        }, _callee32, this);
       }));
 
-      function _processFile(_x16) {
-        return _ref38.apply(this, arguments);
+      function _processFile(_x23) {
+        return _ref44.apply(this, arguments);
       }
 
       return _processFile;
@@ -1338,44 +1590,48 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
   _createClass(DiffUpdateOperation, [{
     key: 'eachRow',
     value: function () {
-      var _ref40 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee27(zaico) {
+      var _ref46 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee33(zaico) {
         var found, res, ignore, diff, _res2;
 
-        return regeneratorRuntime.wrap(function _callee27$(_context27) {
+        return regeneratorRuntime.wrap(function _callee33$(_context33) {
           while (1) {
-            switch (_context27.prev = _context27.next) {
+            switch (_context33.prev = _context33.next) {
               case 0:
-                found = this.findZaicoByKey(zaico.id, 'id');
+                _context33.next = 2;
+                return this.findZaicoByKey(zaico.id, 'id');
+
+              case 2:
+                found = _context33.sent;
 
                 if (!found) {
-                  _context27.next = 23;
+                  _context33.next = 25;
                   break;
                 }
 
                 if (!(Object.keys(zaico).length === 1)) {
-                  _context27.next = 11;
+                  _context33.next = 13;
                   break;
                 }
 
-                _context27.next = 5;
+                _context33.next = 7;
                 return this.requester.remove(found.id, found.code);
 
-              case 5:
-                res = _context27.sent;
+              case 7:
+                res = _context33.sent;
 
                 if (_lodash2.default.isEmpty(res)) {
-                  _context27.next = 9;
+                  _context33.next = 11;
                   break;
                 }
 
-                _context27.next = 9;
-                return this.updateDatum(found.id, true);
-
-              case 9:
-                _context27.next = 21;
-                break;
+                _context33.next = 11;
+                return this.updateDatum(_EditManage2.default.DELETE, found.id);
 
               case 11:
+                _context33.next = 23;
+                break;
+
+              case 13:
                 // 更新
                 // 差分をとって除外キーになってなくて違いがあるデータを残す
                 ignore = new Set(_lodash2.default.get(this.config, 'ignoreKeys.diffUpdate', []));
@@ -1384,42 +1640,42 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
                 });
 
                 if (_lodash2.default.isEmpty(diff)) {
-                  _context27.next = 21;
+                  _context33.next = 23;
                   break;
                 }
 
                 this.log('diff', JSON.stringify(diff));
-                _context27.next = 17;
+                _context33.next = 19;
                 return this.requester.update(found.id, diff);
 
-              case 17:
-                _res2 = _context27.sent;
+              case 19:
+                _res2 = _context33.sent;
 
                 if (_lodash2.default.isEmpty(_res2)) {
-                  _context27.next = 21;
+                  _context33.next = 23;
                   break;
                 }
 
-                _context27.next = 21;
-                return this.updateDatum(found.id);
-
-              case 21:
-                _context27.next = 24;
-                break;
+                _context33.next = 23;
+                return this.updateDatum(_EditManage2.default.UPDATE, found.id, found);
 
               case 23:
+                _context33.next = 26;
+                break;
+
+              case 25:
                 this.log('ID[' + zaico.id + '\u306E\u30C7\u30FC\u30BF\u304C\u672A\u767B\u9332\u306E\u305F\u3081\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093', zaico.jan, zaico.title);
 
-              case 24:
+              case 26:
               case 'end':
-                return _context27.stop();
+                return _context33.stop();
             }
           }
-        }, _callee27, this);
+        }, _callee33, this);
       }));
 
-      function eachRow(_x19) {
-        return _ref40.apply(this, arguments);
+      function eachRow(_x26) {
+        return _ref46.apply(this, arguments);
       }
 
       return eachRow;

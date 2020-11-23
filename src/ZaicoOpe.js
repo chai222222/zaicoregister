@@ -3,8 +3,12 @@ import path from 'path';
 import _ from 'lodash';
 import { forEachSeries } from 'p-iteration';
 import mime from 'mime';
+import JSONStream from 'JSONStream';
 import JsonUtil from './util/JsonUtil'
 import ZaicoRequester from './ZaicoRequester';
+import EditManage from './EditManage';
+import CombinedStream from 'combined-stream';
+import through2Filter from 'through2-filter';
 
 class ZaioOpeBase {
   static Converters = {
@@ -24,8 +28,8 @@ class ZaioOpeBase {
     this.config = config;
     this.options = options;
     this.context = {};
-    this.context.orgData = [];
     this.requester = new ZaicoRequester(config, options);
+    this._editManage = new EditManage(config.editTmpFile);
   }
 
   _cvtArgPath(filePath) {
@@ -92,16 +96,27 @@ class ZaioOpeBase {
     return data;
   }
 
-  loadCacheData() {
-    this.log('** read cahce', this.config.cacheFile);
-    this.context.data = JsonUtil.loadJson(this.config.cacheFile);
-    this.cloneData();
-  }
-
-  saveCacheData() {
-    this.log('** write cahce', this.config.cacheFile);
-    fs.writeFileSync(this.config.cacheFile, JSON.stringify(this.context.data, null, '  '), 'utf-8');
-    this.cloneData();
+  updateCacheData() {
+    this.log('** update cahce', this.config.cacheFile);
+    return new Promise((resolve) => {
+      fs.renameSync(this.config.cacheFile, this.config.cacheOldFile);
+      const dest = [];
+      if (this._editManage.counts(EditManage.DELETE)) dest.push(this._editManage.createDeletedFilter());
+      if (this._editManage.counts(EditManage.UPDATE)) dest.push(this._editManage.createUpdatedMapper());
+      const cacheFileStream = JsonUtil.toJSONArrayInputStream(this.config.cacheOldFile, ...dest);
+      (this._editManage.counts(EditManage.APPEND)
+        ? () => {
+            const cs = CombinedStream.create();
+            cs.append(cacheFileStream);
+            cs.append(this._editManage.createAppendedReadable());
+            return cs;
+          }
+        : () => cacheFileStream
+      )()
+        .pipe(JSONStream.stringify())
+        .pipe(fs.createWriteStream(this.config.cacheFile))
+        .on('end', () => resolve());
+    });
   }
 
   removeCacheData() {
@@ -111,32 +126,38 @@ class ZaioOpeBase {
 
   async zaicoDataToCache() {
     this.log('** get all zaico data', this.config.cacheFile);
-    const out = fs.createWriteStream(this.config.cacheFile);
-    return await this.requester.listToArrayWriter(JsonUtil.createObjectArrayWriter(out));
+    return await this.requester.listToArrayWriter(JsonUtil.createObjectArrayWriter(this.config.cacheFile));
   }
 
   useCache() {
     return this.options.cache && this.config.cacheFile;
   }
 
-  listZaico(jan) {
-    return this.context.data.filter(z => z[this.mappingKey('jan')] === jan);
+  async _listZaico(fn) {
+    const result = [];
+    return new Promise((resolve) => {
+      JsonUtil.toJSONArrayInputStream(this.config.cacheFile)
+        .pipe(through2Filter({ objectMode: true }, fn))
+        .on('data', (data) => result.push(data))
+        .on('end', () => resolve(result));
+    });
   }
 
-  findZaicoByKey(value, key) {
-    return this.context.data.find(z => z[key] === value);
+  async listZaico(jan) {
+    return await this._listZaico(z => z[this.mappingKey('jan')] === jan);
   }
 
-  findZaico(jan) {
-    return this.findZaicoByKey(jan, this.mappingKey('jan'));
+  async findZaicoByKey(value, key) {
+    const res = await this._listZaico(z => z[key] === value);
+    return res.length > 0 && res[0];
   }
 
-  cloneData() {
-    this.context.orgData = _.cloneDeep(this.context.data);
+  async findZaico(jan) {
+    return await this.findZaicoByKey(jan, this.mappingKey('jan'));
   }
 
   isChangedData() {
-    return !_.isEqual(this.context.data, this.context.orgData);
+    return this._editManage.isEdited();
   }
 
   canProcess(files) {
@@ -147,13 +168,14 @@ class ZaioOpeBase {
     if (!fs.existsSync(this.config.cacheFile)) {
       await this.zaicoDataToCache();
     }
-    this.loadCacheData();
   }
 
   async afterFiles() {
+    await this._editManage.end();
     if (this.useCache()) {
-      if (this.isChangedData() && !this.options.dryrun) {
-        this.saveCacheData();
+      // if (this.isChangedData() && !this.options.dryrun) {
+      if (this.isChangedData()) {
+        await this.updateCacheData();
       }
     } else {
       this.removeCacheData();
@@ -166,19 +188,19 @@ class ZaioOpeBase {
   async afterRow() { }
   async eachRow() { }
 
-  async updateDatum(id, del = false) {
+  async updateDatum(mode, id, data) {
     if (this.useCache()) {
-      if (del) {
-        this.context.data = this.context.data.filter(row => row.id !== id);
+      if (mode === EditManage.DELETE) {
+        this._editManage.addData(mode, { id });
       } else {
         const getRes = await this.requester.info(id);
         if (!_.isEmpty(getRes)) {
-          const idx = this.context.data.findIndex(row => row.id === id);
-          if (idx >= 0) {
-            this.context.data[idx] = getRes.data;
-          } else {
-            this.context.data.push(getRes.data);
-          }
+          this._editManage.addData(mode, getRes.data);
+        } else if (this.options.dryrun) {
+          const dummy = { ...data, id };
+          delete dummy.item_image;
+          dummy.updated_at = '2222-22-22T22:22:22+09:00';
+          this._editManage.addData(mode, dummy);
         }
       }
     }
@@ -222,33 +244,34 @@ class ZaioOpeBase {
 class VerifyOperation extends ZaioOpeBase {
 
   async eachRow(row) {
+    const janKey = this.mappingKey('jan');
     const msgs = ['未登録', '登録済み', '**複数登録済み**'];
-    const list = this.listZaico(row.jan);
+    const list = await this.listZaico(row.jan);
     const msg = msgs[list.length > 1 ? 2 : list.length];
-    this.log(msg, list.map(row => row.jan).join(','));
+    this.log(msg, list.map(row => row[janKey]).join(','));
   }
 }
 
 class AddOperation extends ZaioOpeBase {
   async eachRow(row) {
-    if (!this.options.force && this.findZaico(row.jan)) {
+    if (!this.options.force && await this.findZaico(row.jan)) {
       this.log('すでにJANが登録されています', row.jan, row.title);
       return;
     }
     const data = this.createRequestData('add', row);
     const res = await this.requester.add(data);
-    if (!_.isEmpty(res)) await this.updateDatum(res.data.data_id);
+    if (!_.isEmpty(res)) await this.updateDatum(EditManage.APPEND, res.data.data_id, data);
   }
 }
 
 class UpdateOperation extends ZaioOpeBase {
   async eachRow(row) {
-    const found = this.findZaico(row.jan);
+    const found = await this.findZaico(row.jan);
     if (found) {
       const data = this.createRequestData('update', row, found);
       if (this.options.force || !_.toPairs(data).every(([k, v]) => _.isEqual(v, found[k]))) {
         const res = await this.requester.update(found.id, data);
-        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+        if (!_.isEmpty(res)) await this.updateDatum(EditManage.UPDATE, found.id, found);
       }
     } else {
       this.log('未登録のため更新できません', row.jan, row.title);
@@ -258,27 +281,27 @@ class UpdateOperation extends ZaioOpeBase {
 
 class UpdateOrAddOperation extends ZaioOpeBase {
   async eachRow(row) {
-    const found = this.findZaico(row.jan);
+    const found = await this.findZaico(row.jan);
     if (found) {
       const data = this.createRequestData('update', row, found);
       if (this.options.force || !_.toPairs(data).every(([k, v]) => _.isEqual(v, found[k]))) {
         const res = await this.requester.update(found.id, data);
-        if (!_.isEmpty(res)) await this.updateDatum(found.id);
+        if (!_.isEmpty(res)) await this.updateDatum(EditManage.UPDATE, found.id, found);
       }
     } else {
       const data = this.createRequestData('add', row);
       const res = await this.requester.add(data);
-      if (!_.isEmpty(res)) await this.updateDatum(res.data.data_id);
+      if (!_.isEmpty(res)) await this.updateDatum(EditManage.APPEND, res.data.data_id, data);
     }
   }
 }
 
 class DeleteOperation extends ZaioOpeBase {
   async eachRow(row) {
-    const found = this.findZaico(row.jan);
+    const found = await this.findZaico(row.jan);
     if (found) {
       const res = await this.requester.remove(found.id, row.jan);
-      if (!_.isEmpty(res)) await this.updateDatum(found.id, true);
+      if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, found.id);
     } else {
       this.log('未登録のため削除できません', row.jan, row.title);
     }
@@ -316,14 +339,46 @@ class DeleteDuplicateOperation extends ZaioOpeBase {
     return true;
   }
 
-  async _processFiles() {
+  async _createJanCountObj() {
     const janKey = this.mappingKey('jan');
-    const jan2DataArr = this.context.data.reduce((o, val) => {
-      (o[val[janKey]] || (o[val[janKey]] = [])).push(val);
-      return o;
-    }, {})
-    const removeJan = _.toPairs(jan2DataArr).map(([jan, arr]) => {
-      if (arr.length === 1) return undefined;
+    const obj = { };
+    return new Promise((resolve) => {
+      JsonUtil.toJSONArrayInputStream(this.config.cacheFile)
+        .on('data', data => {
+          const jan = data[janKey];
+          if (obj[jan]) {
+            obj[jan]++;
+          } else {
+            obj[jan] = 1;
+          }
+        })
+        .on('end', () => resolve(obj));
+    });
+  }
+
+  async _createDupJan2Data(janCountsObj) {
+    const janKey = this.mappingKey('jan');
+    const obj = { };
+    return new Promise((resolve) => {
+      JsonUtil.toJSONArrayInputStream(this.config.cacheFile)
+        .pipe(through2Filter({ objectMode: true }, data => janCountsObj[data[janKey]] > 1))
+        .on('data', data => {
+          const jan = data[janKey];
+          if (obj[jan]) {
+            obj[jan].push(data);
+          } else {
+            obj[jan] = [ data ];
+          }
+        })
+        .on('end', () => resolve(obj));
+    });
+  }
+
+  async _processFiles() {
+    const janCounts = await this._createJanCountObj();
+    const dupJanObj = await this._createDupJan2Data(janCounts);
+    const removeJan = _.toPairs(dupJanObj).map(([jan, arr]) => {
+      if (arr.length === 1) return undefined; // フィルタしてるので必ず複数だけど前のままにする
       const data = arr.filter(v => v.created_at === v.updated_at);
       if (data.length === arr.length) {
         const { latest, oldest, force } = this.options;
@@ -342,7 +397,7 @@ class DeleteDuplicateOperation extends ZaioOpeBase {
     await forEachSeries(removeJan, async ({jan, data}) => {
       await forEachSeries(data, async d => {
         const res = await this.requester.remove(d.id, jan);
-        if (!_.isEmpty(res)) await this.updateDatum(d.id, true);
+        if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, d.id);
       });
     });
   }
@@ -372,11 +427,11 @@ class CacheFileOperationBase extends ZaioOpeBase {
 
 class DiffUpdateOperation extends CacheFileOperationBase {
   async eachRow(zaico) {
-    const found = this.findZaicoByKey(zaico.id, 'id');
+    const found = await this.findZaicoByKey(zaico.id, 'id');
     if (found) {
       if (Object.keys(zaico).length === 1) { // 削除
         const res = await this.requester.remove(found.id, found.code);
-        if (!_.isEmpty(res)) await this.updateDatum(found.id, true);
+        if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, found.id);
       } else { // 更新
         // 差分をとって除外キーになってなくて違いがあるデータを残す
         const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
@@ -384,7 +439,7 @@ class DiffUpdateOperation extends CacheFileOperationBase {
         if (!_.isEmpty(diff)) {
           this.log('diff', JSON.stringify(diff));
           const res = await this.requester.update(found.id, diff);
-          if (!_.isEmpty(res)) await this.updateDatum(found.id);
+          if (!_.isEmpty(res)) await this.updateDatum(EditManage.UPDATE, found.id, found);
         }
       }
     } else {
