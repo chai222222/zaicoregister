@@ -80,7 +80,7 @@ var EditManage = function () {
             switch (_context.prev = _context.next) {
               case 0:
                 if (!this._editArrWriter) {
-                  _context.next = 3;
+                  _context.next = 7;
                   break;
                 }
 
@@ -91,8 +91,13 @@ var EditManage = function () {
                 // TODO: 変更分が大きくてメモリ問題がでたら遅いけどファイルI/Oに変更する
                 this._editedData = _JsonUtil2.default.loadJson(this._editTmpPath);
                 _fs2.default.unlinkSync(this._editTmpPath);
+                _context.next = 8;
+                break;
 
-              case 5:
+              case 7:
+                this._editedData = [];
+
+              case 8:
               case 'end':
                 return _context.stop();
             }

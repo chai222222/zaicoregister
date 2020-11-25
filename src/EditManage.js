@@ -34,10 +34,12 @@ export default class EditManage {
   async end() {
     if (this._editArrWriter) {
       await this._editArrWriter.end();
+      // TODO: 変更分が大きくてメモリ問題がでたら遅いけどファイルI/Oに変更する
+      this._editedData = JsonUtil.loadJson(this._editTmpPath);
+      fs.unlinkSync(this._editTmpPath);
+    } else {
+      this._editedData = [];
     }
-    // TODO: 変更分が大きくてメモリ問題がでたら遅いけどファイルI/Oに変更する
-    this._editedData = JsonUtil.loadJson(this._editTmpPath);
-    fs.unlinkSync(this._editTmpPath);
   }
 
   isEdited() {
