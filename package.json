@@ -22,7 +22,7 @@
     "axios": "^0.19.2",
     "babel-polyfill": "^6.26.0",
     "combined-stream": "^1.0.8",
-    "lodash": "^4.17.20",
+    "lodash": "^4.17.21",
     "mime": "^2.4.4",
     "p-iteration": "^1.1.8",
     "through2-filter": "^3.0.0",
