@@ -95,8 +95,12 @@ zaicoregister -latest -c -m deleteDuplicate # 重複削除。更新日時と作�
 
 ##### 差分更新
 
+差分で既存のデータを更新する。
+IDがないもの、差分がないものは更新しない。
+IDのみの場合は削除を行う。
+
 ```
-zaicoregister -c -m diffUpdate cacheファイルをコピーして編集したファイル # 差分で既存のデータを更新。IDがないもの、差分がないものは更新しない
+zaicoregister -c -m diffUpdate cacheファイルをコピーして編集したファイル
 ```
 
 ---
@@ -124,7 +128,7 @@ zaicoregister -c -m diffUpdate cacheファイルをコピーして編集した�
   },
   "ignoreKeys": {
     "diffUpdate": [
-      "item_image", "create_at", "update_at", "create_user_name", "update_user_name"
+      "item_image", "created_at", "updated_at", "create_user_name", "update_user_name"
     ]
   },
   "replaceValue": {

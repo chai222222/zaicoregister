@@ -14,6 +14,10 @@ var _fs = require('fs');
 
 var _fs2 = _interopRequireDefault(_fs);
 
+var _crypto = require('crypto');
+
+var _crypto2 = _interopRequireDefault(_crypto);
+
 var _path = require('path');
 
 var _path2 = _interopRequireDefault(_path);
@@ -21,6 +25,10 @@ var _path2 = _interopRequireDefault(_path);
 var _lodash = require('lodash');
 
 var _lodash2 = _interopRequireDefault(_lodash);
+
+var _readline = require('readline');
+
+var _readline2 = _interopRequireDefault(_readline);
 
 var _pIteration = require('p-iteration');
 
@@ -51,6 +59,10 @@ var _combinedStream2 = _interopRequireDefault(_combinedStream);
 var _through2Filter = require('through2-filter');
 
 var _through2Filter2 = _interopRequireDefault(_through2Filter);
+
+var _through2Map = require('through2-map');
+
+var _through2Map2 = _interopRequireDefault(_through2Map);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -238,6 +250,9 @@ var ZaioOpeBase = function () {
       var _ref8 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(fn) {
         var _this3 = this;
 
+        var mapFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function (obj) {
+          return obj;
+        };
         var result;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -245,7 +260,7 @@ var ZaioOpeBase = function () {
               case 0:
                 result = [];
                 return _context2.abrupt('return', new Promise(function (resolve) {
-                  _JsonUtil2.default.toJSONArrayInputStream(_this3.config.cacheFile).pipe((0, _through2Filter2.default)({ objectMode: true }, fn)).on('data', function (data) {
+                  _JsonUtil2.default.toJSONArrayInputStream(_this3.config.cacheFile).pipe((0, _through2Filter2.default)({ objectMode: true }, fn)).pipe((0, _through2Map2.default)({ objectMode: true }, mapFn)).on('data', function (data) {
                     return result.push(data);
                   }).on('end', function () {
                     return resolve(result);
@@ -292,7 +307,7 @@ var ZaioOpeBase = function () {
         }, _callee3, this);
       }));
 
-      function listZaico(_x2) {
+      function listZaico(_x3) {
         return _ref9.apply(this, arguments);
       }
 
@@ -324,7 +339,7 @@ var ZaioOpeBase = function () {
         }, _callee4, this);
       }));
 
-      function findZaicoByKey(_x3, _x4) {
+      function findZaicoByKey(_x4, _x5) {
         return _ref10.apply(this, arguments);
       }
 
@@ -352,7 +367,7 @@ var ZaioOpeBase = function () {
         }, _callee5, this);
       }));
 
-      function findZaico(_x5) {
+      function findZaico(_x6) {
         return _ref11.apply(this, arguments);
       }
 
@@ -597,7 +612,7 @@ var ZaioOpeBase = function () {
         }, _callee13, this);
       }));
 
-      function updateDatum(_x6, _x7, _x8) {
+      function updateDatum(_x7, _x8, _x9) {
         return _ref19.apply(this, arguments);
       }
 
@@ -641,7 +656,7 @@ var ZaioOpeBase = function () {
         }, _callee14, this);
       }));
 
-      function processFiles(_x9) {
+      function processFiles(_x10) {
         return _ref20.apply(this, arguments);
       }
 
@@ -678,7 +693,7 @@ var ZaioOpeBase = function () {
                     }, _callee15, _this5);
                   }));
 
-                  return function (_x11) {
+                  return function (_x12) {
                     return _ref22.apply(this, arguments);
                   };
                 }());
@@ -691,7 +706,7 @@ var ZaioOpeBase = function () {
         }, _callee16, this);
       }));
 
-      function _processFiles(_x10) {
+      function _processFiles(_x11) {
         return _ref21.apply(this, arguments);
       }
 
@@ -710,21 +725,22 @@ var ZaioOpeBase = function () {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
+                this.log('*** load 編集ファイル ***');
                 jangetterResult = _JsonUtil2.default.loadJson(filePath);
 
                 this.log('***', jangetterResult.title, '***');
                 rows = jangetterResult.rows;
 
                 if (!Array.isArray(rows)) {
-                  _context18.next = 14;
+                  _context18.next = 15;
                   break;
                 }
 
-                _context18.next = 8;
+                _context18.next = 9;
                 return this.beforeRows(rows);
 
-              case 8:
-                _context18.next = 10;
+              case 9:
+                _context18.next = 11;
                 return (0, _pIteration.forEachSeries)(rows, function () {
                   var _ref24 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee17(row, idx) {
                     return regeneratorRuntime.wrap(function _callee17$(_context17) {
@@ -735,7 +751,7 @@ var ZaioOpeBase = function () {
                             return _this6.beforeRow(row);
 
                           case 2:
-                            _this6.log('* [' + (idx + 1) + '/' + rows.length + ']', row.title);
+                            _this6._writeRowTitle('* [' + (idx + 1) + '/' + rows.length + ']', row.title);
                             _context17.next = 5;
                             return _this6.eachRow(row);
 
@@ -751,23 +767,23 @@ var ZaioOpeBase = function () {
                     }, _callee17, _this6);
                   }));
 
-                  return function (_x13, _x14) {
+                  return function (_x14, _x15) {
                     return _ref24.apply(this, arguments);
                   };
                 }());
 
-              case 10:
-                _context18.next = 12;
+              case 11:
+                _context18.next = 13;
                 return this.afterRows(rows);
 
-              case 12:
-                _context18.next = 15;
+              case 13:
+                _context18.next = 16;
                 break;
 
-              case 14:
+              case 15:
                 this.log('*** rows is not array.');
 
-              case 15:
+              case 16:
               case 'end':
                 return _context18.stop();
             }
@@ -775,12 +791,19 @@ var ZaioOpeBase = function () {
         }, _callee18, this);
       }));
 
-      function _processFile(_x12) {
+      function _processFile(_x13) {
         return _ref23.apply(this, arguments);
       }
 
       return _processFile;
     }()
+  }, {
+    key: '_writeRowTitle',
+    value: function _writeRowTitle() {
+      // readline.clearLine(process.stdout);
+      // readline.cursorTo(process.stdout, 0);
+      // process.stdout.write(str.join(' '));
+    }
   }]);
 
   return ZaioOpeBase;
@@ -838,7 +861,7 @@ var VerifyOperation = function (_ZaioOpeBase) {
         }, _callee19, this);
       }));
 
-      function eachRow(_x15) {
+      function eachRow(_x16) {
         return _ref25.apply(this, arguments);
       }
 
@@ -913,7 +936,7 @@ var AddOperation = function (_ZaioOpeBase2) {
         }, _callee20, this);
       }));
 
-      function eachRow(_x16) {
+      function eachRow(_x17) {
         return _ref26.apply(this, arguments);
       }
 
@@ -995,7 +1018,7 @@ var UpdateOperation = function (_ZaioOpeBase3) {
         }, _callee21, this);
       }));
 
-      function eachRow(_x17) {
+      function eachRow(_x18) {
         return _ref27.apply(this, arguments);
       }
 
@@ -1091,7 +1114,7 @@ var UpdateOrAddOperation = function (_ZaioOpeBase4) {
         }, _callee22, this);
       }));
 
-      function eachRow(_x18) {
+      function eachRow(_x19) {
         return _ref30.apply(this, arguments);
       }
 
@@ -1160,7 +1183,7 @@ var DeleteOperation = function (_ZaioOpeBase5) {
         }, _callee23, this);
       }));
 
-      function eachRow(_x19) {
+      function eachRow(_x20) {
         return _ref33.apply(this, arguments);
       }
 
@@ -1343,7 +1366,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
         }, _callee27, this);
       }));
 
-      function _createDupJan2Data(_x20) {
+      function _createDupJan2Data(_x21) {
         return _ref37.apply(this, arguments);
       }
 
@@ -1444,7 +1467,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                                 }, _callee28, _this16);
                               }));
 
-                              return function (_x22) {
+                              return function (_x23) {
                                 return _ref43.apply(this, arguments);
                               };
                             }());
@@ -1457,7 +1480,7 @@ var DeleteDuplicateOperation = function (_ZaioOpeBase7) {
                     }, _callee29, _this16);
                   }));
 
-                  return function (_x21) {
+                  return function (_x22) {
                     return _ref41.apply(this, arguments);
                   };
                 }());
@@ -1503,20 +1526,21 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
               case 0:
                 this.context.filePath = filePath; // 対象ファイル
                 this.context.fileDir = _path2.default.dirname(filePath); // 対象dir
+                this.log('*** load 編集ファイル ***');
                 zaicos = _JsonUtil2.default.loadJson(filePath);
 
                 this.log('*** cacheファイル操作 ***');
 
                 if (!Array.isArray(zaicos)) {
-                  _context32.next = 13;
+                  _context32.next = 14;
                   break;
                 }
 
-                _context32.next = 7;
+                _context32.next = 8;
                 return this.beforeRows(zaicos);
 
-              case 7:
-                _context32.next = 9;
+              case 8:
+                _context32.next = 10;
                 return (0, _pIteration.forEachSeries)(zaicos, function () {
                   var _ref45 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee31(zaico, idx) {
                     return regeneratorRuntime.wrap(function _callee31$(_context31) {
@@ -1527,7 +1551,7 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
                             return _this18.beforeRow(zaico);
 
                           case 2:
-                            _this18.log('* [' + (idx + 1) + '/' + zaicos.length + ']', zaico.title);
+                            _this18._writeRowTitle('* [' + (idx + 1) + '/' + zaicos.length + ']', zaico.title);
                             _context31.next = 5;
                             return _this18.eachRow(zaico);
 
@@ -1543,23 +1567,23 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
                     }, _callee31, _this18);
                   }));
 
-                  return function (_x24, _x25) {
+                  return function (_x25, _x26) {
                     return _ref45.apply(this, arguments);
                   };
                 }());
 
-              case 9:
-                _context32.next = 11;
+              case 10:
+                _context32.next = 12;
                 return this.afterRows(zaicos);
 
-              case 11:
-                _context32.next = 14;
+              case 12:
+                _context32.next = 15;
                 break;
 
-              case 13:
+              case 14:
                 this.log('*** ' + filePath + ' is not array.');
 
-              case 14:
+              case 15:
               case 'end':
                 return _context32.stop();
             }
@@ -1567,7 +1591,7 @@ var CacheFileOperationBase = function (_ZaioOpeBase8) {
         }, _callee32, this);
       }));
 
-      function _processFile(_x23) {
+      function _processFile(_x24) {
         return _ref44.apply(this, arguments);
       }
 
@@ -1588,85 +1612,34 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
   }
 
   _createClass(DiffUpdateOperation, [{
-    key: 'eachRow',
+    key: 'beforeRows',
     value: function () {
-      var _ref46 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee33(zaico) {
-        var found, res, ignore, diff, _res2;
+      var _ref46 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee33(zaicos) {
+        var _this20 = this;
 
+        var idHash;
         return regeneratorRuntime.wrap(function _callee33$(_context33) {
           while (1) {
             switch (_context33.prev = _context33.next) {
               case 0:
-                _context33.next = 2;
-                return this.findZaicoByKey(zaico.id, 'id');
-
-              case 2:
-                found = _context33.sent;
-
-                if (!found) {
-                  _context33.next = 25;
-                  break;
-                }
-
-                if (!(Object.keys(zaico).length === 1)) {
-                  _context33.next = 13;
-                  break;
-                }
-
-                _context33.next = 7;
-                return this.requester.remove(found.id, found.code);
-
-              case 7:
-                res = _context33.sent;
-
-                if (_lodash2.default.isEmpty(res)) {
-                  _context33.next = 11;
-                  break;
-                }
-
-                _context33.next = 11;
-                return this.updateDatum(_EditManage2.default.DELETE, found.id);
-
-              case 11:
-                _context33.next = 23;
-                break;
-
-              case 13:
-                // 更新
-                // 差分をとって除外キーになってなくて違いがあるデータを残す
-                ignore = new Set(_lodash2.default.get(this.config, 'ignoreKeys.diffUpdate', []));
-                diff = _lodash2.default.pickBy(zaico, function (v, k) {
-                  return k in found && !ignore.has(k) && !_lodash2.default.isEqual(v, found[k]);
+                // 差分更新で無視するキー
+                this.ignoreKeys = new Set(_lodash2.default.get(this.config, 'ignoreKeys.diffUpdate', []));
+                this.log('** 差分更新前処理[cacheファイルハッシュ作成]開始 **');
+                _context33.next = 4;
+                return this._listZaico(function (_ref47) {
+                  var id = _ref47.id;
+                  return !!id;
+                }, function (zaico) {
+                  return [zaico.id, { code: zaico.code, hash: _this20.hash(_this20.diffZaico(zaico)) }];
                 });
 
-                if (_lodash2.default.isEmpty(diff)) {
-                  _context33.next = 23;
-                  break;
-                }
+              case 4:
+                idHash = _context33.sent;
 
-                this.log('diff', JSON.stringify(diff));
-                _context33.next = 19;
-                return this.requester.update(found.id, diff);
+                this.id2HashObj = new Map(idHash); // キャッシュデータの id をキー、データのハッシュ文字列をバリュー
+                this.log('** 差分更新前処理[cacheファイルハッシュ作成]終了 **');
 
-              case 19:
-                _res2 = _context33.sent;
-
-                if (_lodash2.default.isEmpty(_res2)) {
-                  _context33.next = 23;
-                  break;
-                }
-
-                _context33.next = 23;
-                return this.updateDatum(_EditManage2.default.UPDATE, found.id, found);
-
-              case 23:
-                _context33.next = 26;
-                break;
-
-              case 25:
-                this.log('ID[' + zaico.id + '\u306E\u30C7\u30FC\u30BF\u304C\u672A\u767B\u9332\u306E\u305F\u3081\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093', zaico.jan, zaico.title);
-
-              case 26:
+              case 7:
               case 'end':
                 return _context33.stop();
             }
@@ -1674,8 +1647,125 @@ var DiffUpdateOperation = function (_CacheFileOperationBa) {
         }, _callee33, this);
       }));
 
-      function eachRow(_x26) {
+      function beforeRows(_x27) {
         return _ref46.apply(this, arguments);
+      }
+
+      return beforeRows;
+    }()
+  }, {
+    key: 'hash',
+    value: function hash(obj) {
+      var md5 = _crypto2.default.createHash('md5');
+      md5.update(JSON.stringify(obj));
+      return md5.digest('hex');
+    }
+
+    /**
+     * 在庫データ同士を比較し、差分があるデータを抽出します。
+     * ignoreKeys.diffUpdateにあるキーは除外されます。
+     * キャッシュ在庫データを省略したときは編集在庫データから ignoreKeys.diffUpdateにあるキーを除外した結果を返します。
+     *
+     * @param {Object} editZaico 編集在庫データ
+     * @param {?Object} cacheZaico キャッシュ在庫データ
+     * @return {Object} 差分として残った key, value を持ったオブジェクト
+     */
+
+  }, {
+    key: 'diffZaico',
+    value: function diffZaico(editZaico, cacheZaico) {
+      var _this21 = this;
+
+      return _lodash2.default.pickBy(editZaico, function (v, k) {
+        return !_this21.ignoreKeys.has(k) && (!cacheZaico || k in cacheZaico && !_lodash2.default.isEqual(v, cacheZaico[k]));
+      });
+    }
+  }, {
+    key: 'eachRow',
+    value: function () {
+      var _ref48 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee34(zaico) {
+        var hashObj, res, found, diff, _res2;
+
+        return regeneratorRuntime.wrap(function _callee34$(_context34) {
+          while (1) {
+            switch (_context34.prev = _context34.next) {
+              case 0:
+                hashObj = this.id2HashObj.get(zaico.id);
+
+                if (!hashObj) {
+                  _context34.next = 26;
+                  break;
+                }
+
+                if (!(Object.keys(zaico).length === 1)) {
+                  _context34.next = 11;
+                  break;
+                }
+
+                _context34.next = 5;
+                return this.requester.remove(zaico.id, hashObj.code);
+
+              case 5:
+                res = _context34.sent;
+
+                if (_lodash2.default.isEmpty(res)) {
+                  _context34.next = 9;
+                  break;
+                }
+
+                _context34.next = 9;
+                return this.updateDatum(_EditManage2.default.DELETE, zaico.id);
+
+              case 9:
+                _context34.next = 24;
+                break;
+
+              case 11:
+                if (!(this.hash(this.diffZaico(zaico)) !== hashObj.hash)) {
+                  _context34.next = 24;
+                  break;
+                }
+
+                this.log('DIFF HASH');
+                _context34.next = 15;
+                return this.findZaicoByKey(zaico.id, 'id');
+
+              case 15:
+                found = _context34.sent;
+                diff = this.diffZaico(zaico, found);
+
+                this.log('\ndiff [' + found.title + '] ' + JSON.stringify(diff, null, 2) + '\n');
+                _context34.next = 20;
+                return this.requester.update(found.id, diff);
+
+              case 20:
+                _res2 = _context34.sent;
+
+                if (_lodash2.default.isEmpty(_res2)) {
+                  _context34.next = 24;
+                  break;
+                }
+
+                _context34.next = 24;
+                return this.updateDatum(_EditManage2.default.UPDATE, found.id, found);
+
+              case 24:
+                _context34.next = 27;
+                break;
+
+              case 26:
+                this.log('ID[' + zaico.id + ']\u306E\u30C7\u30FC\u30BF\u304C\u672A\u767B\u9332\u306E\u305F\u3081\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093', JSON.stringify(zaico));
+
+              case 27:
+              case 'end':
+                return _context34.stop();
+            }
+          }
+        }, _callee34, this);
+      }));
+
+      function eachRow(_x28) {
+        return _ref48.apply(this, arguments);
       }
 
       return eachRow;

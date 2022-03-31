@@ -1,6 +1,8 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import _ from 'lodash';
+import readline from 'readline';
 import { forEachSeries } from 'p-iteration';
 import mime from 'mime';
 import JSONStream from 'JSONStream';
@@ -9,6 +11,7 @@ import ZaicoRequester from './ZaicoRequester';
 import EditManage from './EditManage';
 import CombinedStream from 'combined-stream';
 import through2Filter from 'through2-filter';
+import through2Map from 'through2-map';
 
 class ZaioOpeBase {
   static Converters = {
@@ -133,11 +136,12 @@ class ZaioOpeBase {
     return this.options.cache && this.config.cacheFile;
   }
 
-  async _listZaico(fn) {
+  async _listZaico(fn, mapFn = obj => obj) {
     const result = [];
     return new Promise((resolve) => {
       JsonUtil.toJSONArrayInputStream(this.config.cacheFile)
         .pipe(through2Filter({ objectMode: true }, fn))
+        .pipe(through2Map({ objectMode: true }, mapFn))
         .on('data', (data) => result.push(data))
         .on('end', () => resolve(result));
     });
@@ -223,6 +227,7 @@ class ZaioOpeBase {
   async _processFile(filePath) {
     this.context.filePath = filePath; // 対象ファイル
     this.context.fileDir = path.dirname(filePath); // 対象dir
+    this.log('*** load 編集ファイル ***');
     const jangetterResult = JsonUtil.loadJson(filePath);
     this.log('***', jangetterResult.title, '***');
     const rows = jangetterResult.rows;
@@ -230,7 +235,7 @@ class ZaioOpeBase {
       await this.beforeRows(rows);
       await forEachSeries(rows, async (row, idx) => {
         await this.beforeRow(row);
-        this.log(`* [${idx+1}/${rows.length}]`, row.title);
+        this._writeRowTitle(`* [${idx+1}/${rows.length}]`, row.title);
         await this.eachRow(row);
         await this.afterRow(row);
       });
@@ -239,6 +244,13 @@ class ZaioOpeBase {
       this.log('*** rows is not array.');
     }
   }
+
+  _writeRowTitle(...str) {
+    // readline.clearLine(process.stdout);
+    // readline.cursorTo(process.stdout, 0);
+    // process.stdout.write(str.join(' '));
+  }
+
 }
 
 class VerifyOperation extends ZaioOpeBase {
@@ -408,13 +420,14 @@ class CacheFileOperationBase extends ZaioOpeBase {
   async _processFile(filePath) {
     this.context.filePath = filePath; // 対象ファイル
     this.context.fileDir = path.dirname(filePath); // 対象dir
+    this.log('*** load 編集ファイル ***');
     const zaicos = JsonUtil.loadJson(filePath);
     this.log('*** cacheファイル操作 ***');
     if (Array.isArray(zaicos)) {
       await this.beforeRows(zaicos);
       await forEachSeries(zaicos, async (zaico, idx) => {
         await this.beforeRow(zaico);
-        this.log(`* [${idx+1}/${zaicos.length}]`, zaico.title);
+        this._writeRowTitle(`* [${idx+1}/${zaicos.length}]`, zaico.title);
         await this.eachRow(zaico);
         await this.afterRow(zaico);
       });
@@ -426,25 +439,77 @@ class CacheFileOperationBase extends ZaioOpeBase {
 }
 
 class DiffUpdateOperation extends CacheFileOperationBase {
+
+  async beforeRows(zaicos) {
+    // 差分更新で無視するキー
+    this.ignoreKeys = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
+    this.log('** 差分更新前処理[cacheファイルハッシュ作成]開始 **');
+    const idHash = await this._listZaico(({ id }) => !!id, zaico => [
+      zaico.id,
+      { code: zaico.code, hash: this.hash(this.diffZaico(zaico)) },
+    ]);
+    this.id2HashObj = new Map(idHash); // キャッシュデータの id をキー、データのハッシュ文字列をバリュー
+    this.log('** 差分更新前処理[cacheファイルハッシュ作成]終了 **');
+  }
+
+  hash(obj) {
+    const md5 = crypto.createHash('md5');
+    md5.update(JSON.stringify(obj));
+    return md5.digest('hex');
+  }
+
+  /**
+   * 在庫データ同士を比較し、差分があるデータを抽出します。
+   * ignoreKeys.diffUpdateにあるキーは除外されます。
+   * キャッシュ在庫データを省略したときは編集在庫データから ignoreKeys.diffUpdateにあるキーを除外した結果を返します。
+   *
+   * @param {Object} editZaico 編集在庫データ
+   * @param {?Object} cacheZaico キャッシュ在庫データ
+   * @return {Object} 差分として残った key, value を持ったオブジェクト
+   */
+  diffZaico(editZaico, cacheZaico) {
+    return _.pickBy(editZaico, (v, k) => !this.ignoreKeys.has(k) &&
+                                          (!cacheZaico || k in cacheZaico && !_.isEqual(v, cacheZaico[k])));
+  }
+
   async eachRow(zaico) {
-    const found = await this.findZaicoByKey(zaico.id, 'id');
-    if (found) {
+    const hashObj = this.id2HashObj.get(zaico.id);
+    if (hashObj) {
       if (Object.keys(zaico).length === 1) { // 削除
-        const res = await this.requester.remove(found.id, found.code);
-        if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, found.id);
+        const res = await this.requester.remove(zaico.id, hashObj.code);
+        if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, zaico.id);
       } else { // 更新
-        // 差分をとって除外キーになってなくて違いがあるデータを残す
-        const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
-        const diff = _.pickBy(zaico, (v, k) => k in found && !ignore.has(k) && !_.isEqual(v, found[k]));
-        if (!_.isEmpty(diff)) {
-          this.log('diff', JSON.stringify(diff));
+          // 差分をとって除外キーになってなくて違いがあるデータのハッシュ値を比較する
+        if (this.hash(this.diffZaico(zaico)) !== hashObj.hash) {
+          this.log('DIFF HASH');
+          const found = await this.findZaicoByKey(zaico.id, 'id');
+          const diff = this.diffZaico(zaico, found)
+          this.log(`\ndiff [${found.title}] ${JSON.stringify(diff, null, 2)}\n`);
           const res = await this.requester.update(found.id, diff);
           if (!_.isEmpty(res)) await this.updateDatum(EditManage.UPDATE, found.id, found);
         }
       }
     } else {
-      this.log(`ID[${zaico.id}のデータが未登録のため更新できません`, zaico.jan, zaico.title);
+      this.log(`ID[${zaico.id}]のデータが未登録のため更新できません`, JSON.stringify(zaico));
     }
+    // const found = await this.findZaicoByKey(zaico.id, 'id');
+    // if (found) {
+    //   if (Object.keys(zaico).length === 1) { // 削除
+    //     const res = await this.requester.remove(found.id, found.code);
+    //     if (!_.isEmpty(res)) await this.updateDatum(EditManage.DELETE, found.id);
+    //   } else { // 更新
+    //     // 差分をとって除外キーになってなくて違いがあるデータを残す
+    //     const ignore = new Set(_.get(this.config, 'ignoreKeys.diffUpdate', []));
+    //     const diff = _.pickBy(zaico, (v, k) => k in found && !ignore.has(k) && !_.isEqual(v, found[k]));
+    //     if (!_.isEmpty(diff)) {
+    //       this.log('diff', JSON.stringify(diff));
+    //       const res = await this.requester.update(found.id, diff);
+    //       if (!_.isEmpty(res)) await this.updateDatum(EditManage.UPDATE, found.id, found);
+    //     }
+    //   }
+    // } else {
+    //   this.log(`ID[${zaico.id}のデータが未登録のため更新できません`, zaico.jan, zaico.title);
+    // }
   }
 }
 
